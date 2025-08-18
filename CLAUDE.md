@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an AstroPaper blog built with Astro, TailwindCSS, and TypeScript. It's a minimal, responsive, and SEO-friendly blog theme configured for deployment on Cloudflare Pages. The project includes features like dynamic OG image generation, fuzzy search (via Pagefind), dark/light mode toggle, and RSS feed generation.
+This is an AstroPaper blog built with Astro, TailwindCSS, and TypeScript. It's a minimal, responsive, and SEO-friendly blog theme configured for static deployment on Cloudflare Pages. The project includes features like dynamic OG image generation, fuzzy search (via Pagefind), dark/light mode toggle, and RSS feed generation.
 
 ## Development Commands
 

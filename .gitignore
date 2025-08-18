@@ -27,3 +27,6 @@ pnpm-debug.log*
 
 public/pagefind
 .vercel
+
+# scratch workspace - not version controlled
+scratch/

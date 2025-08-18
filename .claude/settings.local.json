@@ -6,7 +6,17 @@
       "Bash(pnpm add:*)",
       "Bash(pnpm run:*)",
       "Bash(pnpm remove:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "Bash(wrangler login:*)",
+      "Bash(pnpm wrangler:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "WebFetch(domain:joshualelon.com)",
+      "Bash(mkdir:*)",
+      "mcp__notion__search",
+      "mcp__notion__fetch"
     ],
     "deny": [],
     "ask": []
