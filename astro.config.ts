@@ -11,7 +11,6 @@ import {
 import { transformerFileName } from "./src/utils/transformers/fileName";
 import { SITE } from "./src/config";
 
-import vercel from "@astrojs/vercel";
 
 // https://astro.build/config
 export default defineConfig({
@@ -69,13 +68,5 @@ export default defineConfig({
     preserveScriptOrder: true,
   },
 
-  adapter: vercel({
-    imageService: true,
-    imagesConfig: {
-      sizes: [320, 640, 1280],
-    },
-    webAnalytics: {
-      enabled: true,
-    },
-  }),
+  output: 'static',
 });
