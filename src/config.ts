@@ -4,7 +4,7 @@ export const SITE = {
   profile: "https://joshualelon.com/",
   desc: "Software engineer passionate about education technology and machine learning. Writing about code, learning, and building products that help people grow.",
   title: "Joshua Lelon",
-  ogImage: "astropaper-og.jpg",
+  ogImage: "og.png",
   lightAndDarkMode: true,
   postPerIndex: 4,
   postPerPage: 4,
