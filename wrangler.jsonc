@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "joshua-lelon-com",
+  "name": "joshualelon-com",
   "compatibility_date": "2025-03-25",
   "pages_build_output_dir": "dist",
   "observability": {

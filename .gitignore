@@ -30,3 +30,9 @@ public/pagefind
 
 # scratch workspace - not version controlled
 scratch/
+
+# wrangler
+.wrangler/
+
+# claude code local settings
+.claude/settings.local.json

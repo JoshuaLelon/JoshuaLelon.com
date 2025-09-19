@@ -16,7 +16,10 @@
       "WebFetch(domain:joshualelon.com)",
       "Bash(mkdir:*)",
       "mcp__notion__search",
-      "mcp__notion__fetch"
+      "mcp__notion__fetch",
+      "Bash(npx wrangler pages domain list:*)",
+      "Bash(npx wrangler pages project show:*)",
+      "Bash(dig:*)"
     ],
     "deny": [],
     "ask": []
