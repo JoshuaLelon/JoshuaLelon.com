@@ -128,9 +128,55 @@ aws lambda update-function-configuration \
 **What happened:** The error stopped immediately.
 **Takeaway:** The fix was always correct. The deployment pipeline was the only problem.
 
+### Round 5: Manual deploys get overwritten by the sandbox
+
+**I noticed:** After writing a deploy script to build and deploy Lambdas manually, the fix worked — then stopped working again minutes later.
+**I suspected:** The Amplify sandbox was overwriting my manual deploy with its own stale bundle.
+**I tested it:** Deployed manually, verified the fix was in the bundle, waited, then downloaded the bundle again:
+
+```bash
+# Deploy and verify — fix is there
+aws lambda update-function-code ...
+grep -c "stripGeminiUnsupportedProps" /tmp/lambda/index.mjs
+# => 4
+
+# Wait for sandbox to detect a file change...
+# Download again
+grep -c "stripGeminiUnsupportedProps" /tmp/lambda/index.mjs
+# => 0  — gone!
+```
+
+**What happened:** The sandbox detected a file change, triggered a CDK hotswap, and overwrote my working deploy with its own stale bundle.
+**Takeaway:** Manual deploys are temporary. The sandbox will overwrite them on the next file change. You need to fix the sandbox's own bundling.
+
+### Round 6: Find and clear the stale CDK asset cache
+
+**I noticed:** The sandbox's bundle didn't have the fix, but my local esbuild did. Same source, different output.
+**I suspected:** CDK was caching a stale build artifact and reusing it instead of rebuilding.
+**I tested it:** Checked the CDK output directory for cached Lambda bundles:
+
+```bash
+# Check all CDK-cached Lambda bundles
+for f in .amplify/artifacts/cdk.out/asset.*/index.mjs; do
+  echo "$f: $(grep -c 'stripGeminiUnsupportedProps' "$f")"
+done
+# asset.1a272720.../index.mjs: 0
+# asset.61067302.../index.mjs: 0
+# asset.e13b6332.../index.mjs: 0
+```
+
+**What happened:** All three cached Lambda bundles (one per function) were stale — zero matches. CDK was reusing these cached artifacts on every hotswap instead of rebuilding from source.
+**Takeaway:** CDK caches Lambda bundles in `.amplify/artifacts/cdk.out/asset.*/`. If the cache goes stale (e.g., due to a failed initial build, or a `MultipleLockFilesFound` error), every subsequent hotswap reuses the stale bundle. Clearing the cache forces a fresh build.
+
 ## The Root Cause
 
-The Amplify Gen 2 sandbox silently fails to hotswap Lambda code in certain conditions. The sandbox continues running and watching files, but the Lambda deployment step silently errors — no crash, no visible error in the dev server output. The Lambda keeps running the last successfully deployed bundle indefinitely.
+Two layers of caching conspire to keep your Lambda running stale code:
+
+1. **CDK asset caching.** CDK stores built Lambda bundles in `.amplify/artifacts/cdk.out/asset.*/`. When the sandbox hotswaps, it reuses these cached bundles if CDK's content hash hasn't changed. If the initial build was stale (e.g., due to a `MultipleLockFilesFound` error from conflicting lock files), every subsequent hotswap deploys the same stale bundle — even though your source code has changed.
+
+2. **Lambda warm containers.** Even after deploying new code, warm Lambda containers keep running the old code until they cold-start. A cold start (updating an env var) only helps if the *deployed bundle* is correct — it doesn't trigger a rebuild.
+
+3. **Manual deploys get overwritten.** If you deploy manually via `aws lambda update-function-code`, the sandbox will overwrite your deploy on the next file change, redeploying from its stale CDK cache.
 
 This is especially insidious because:
 
@@ -138,8 +184,9 @@ This is especially insidious because:
 2. **Some operations still work.** Operations that don't hit the changed code path continue working, making it look like the Lambda is "running."
 3. **Cold starts don't help.** They recycle the container with the *existing deployed bundle* — they don't trigger a new build+deploy.
 4. **The code is correct locally.** Running the same code in Node.js locally works perfectly.
+5. **Manual deploys are temporary.** The sandbox overwrites them on the next hotswap.
 
-A contributing factor: if both `bun.lock` and `package-lock.json` exist, Amplify's CDK throws `MultipleLockFilesFound` during Lambda bundling. The sandbox swallows this error and keeps running with the last good bundle.
+A contributing factor: if both `bun.lock` and `package-lock.json` exist, Amplify's CDK throws `MultipleLockFilesFound` during Lambda bundling. The sandbox swallows this error and keeps running with the last good bundle — which then gets cached as the CDK asset.
 
 ## The Fix
 
@@ -204,12 +251,32 @@ echo "Deployed successfully"
 rm -rf "$BUILD_DIR"
 ```
 
+### Clear the CDK asset cache
+
+The most important fix: clear the stale CDK cache so the sandbox rebuilds from current source.
+
+```bash
+# Nuclear option: clear all Amplify artifacts (forces full re-synthesis)
+rm -rf .amplify/artifacts/cdk.out
+
+# Then restart the sandbox — it will rebuild all Lambda bundles from scratch
+npx ampx sandbox
+```
+
+Wire this into your dev server start scripts so it happens automatically:
+
+```bash
+# In your start script, before launching the sandbox:
+rm -rf .amplify/artifacts/cdk.out
+```
+
 ### Key points
 
-1. **Build locally** — esbuild produces the same ESM bundle Amplify would, in ~50ms.
-2. **Hash the bundle** — SHA256 comparison means the fast path (no changes) takes ~200ms. Only deploy when the code actually changed.
-3. **Force cold starts after deploy** — update a `FORCE_COLD_START` env var so warm containers recycle and pick up the new code.
-4. **Run on every dev server start** — wire this into your start scripts so you never forget.
+1. **Clear the CDK cache on every start** — `rm -rf .amplify/artifacts/cdk.out` forces the sandbox to rebuild Lambda bundles from current source instead of reusing stale cached artifacts.
+2. **Build locally as backup** — esbuild produces the same ESM bundle Amplify would, in ~50ms.
+3. **Hash the bundle** — SHA256 comparison means the fast path (no changes) takes ~200ms. Only deploy when the code actually changed.
+4. **Force cold starts after deploy** — update a `FORCE_COLD_START` env var so warm containers recycle and pick up the new code.
+5. **Run on every dev server start** — wire this into your start scripts so you never forget.
 
 ### Verify your deployed code
 
