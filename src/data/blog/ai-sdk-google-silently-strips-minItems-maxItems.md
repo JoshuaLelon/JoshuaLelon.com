@@ -1,10 +1,11 @@
 ---
-title: "AI SDK Google Provider Silently Strips minItems/maxItems From Schemas"
+title: "AI Providers Reject minItems/maxItems — And Each SDK Handles It Differently"
 pubDatetime: 2026-03-22T11:06:00Z
-description: "The Vercel AI SDK's Google provider silently strips minItems and maxItems from JSON schemas before sending them to Gemini — which is actually correct, because Gemini rejects them despite the docs."
+description: "Gemini AND Anthropic both reject minItems/maxItems in JSON Schema structured output. The AI SDK's Google provider silently strips them; the Anthropic provider doesn't. The fix: never put array constraints in schemas sent to any provider."
 tags:
   - ai-sdk
   - gemini
+  - anthropic
   - typescript
   - zod
   - aws-lambda
@@ -14,14 +15,15 @@ featured: false
 
 ## TL;DR
 
-The Vercel AI SDK's Google provider strips `minItems` and `maxItems` from JSON schemas via a whitelist destructuring pattern in `convertJSONSchemaToOpenAPISchema`. Despite Google's docs listing these as supported, the Gemini API rejects them with `output_config.format.schema: For 'array' type, property 'maxItems' is not supported`. The SDK's stripping is actually *correct* behavior. If you hit this error, your Lambda/server is likely running stale code that predates the stripping.
+Both Gemini and Anthropic reject `minItems`/`maxItems` in structured output JSON schemas with the same error: `output_config.format.schema: For 'array' type, property 'maxItems' is not supported`. The Vercel AI SDK's Google provider silently strips them (correct behavior); the Anthropic provider passes them through (crash). The fix: never use `.min()`, `.max()`, or `.length()` on Zod arrays in schemas sent to any AI provider. Specify counts in prompt text instead.
 
 ## Environment
 
 - `ai` 6.0.134 (Vercel AI SDK)
 - `@ai-sdk/google` 3.0.52
+- `@ai-sdk/anthropic` 3.0.63
 - `zod` 4.3.6
-- `gemini-2.5-flash` model
+- `gemini-2.5-flash`, `claude-sonnet-4-5-20250929` models
 - Node.js 24.10.0, macOS 26.3.1
 - AWS Lambda (nodejs22.x) via AWS Amplify Gen 2 sandbox
 
@@ -102,54 +104,112 @@ grep -c "toGeminiSafeSchema" /tmp/lambda-code/index.mjs
 **What happened:** Zero instances of `toGeminiSafeSchema` or `stripGeminiUnsupportedProps` in the deployed bundle. The workaround was committed but **never deployed**. The Amplify sandbox silently failed to hotswap.
 **Takeaway:** The Lambda was running code from before the fix. The cold start only recycled the *old* code. You must verify what code is actually deployed, not what's on disk.
 
-### Round 5: Verify the fix works end-to-end
+### Round 5: Fix the deployment, strip all Gemini schemas
 
-**I noticed:** The deployed bundle also lacked the `convertJSONSchemaToOpenAPISchema` improvements from v3.0.52 — the bundle was built with an older `@ai-sdk/google` version that didn't strip `maxItems`.
-**I suspected:** Building locally with current `node_modules` and deploying manually would fix it.
-**I tested it:** Built the Lambda bundle with esbuild, prepended the Amplify SSM shims, zipped, and uploaded:
+**I noticed:** The deployed bundle was stale because CDK cached a stale build artifact in `.amplify/artifacts/cdk.out/asset.*/`.
+**I suspected:** Clearing the CDK cache + manually deploying would fix it.
+**I tested it:** Cleared the CDK cache, rebuilt with esbuild, deployed all 3 Lambdas. Also removed all `.min()`, `.max()`, `.length()` constraints from Zod arrays in every Gemini-path schema (~28 schemas).
+**What happened:** The Gemini operations stopped failing. But a *different* operation started failing with the exact same error.
+**Takeaway:** Fixing Gemini schemas revealed a deeper problem.
+
+### Round 6: The error is coming from *Anthropic*, not Gemini
+
+**I noticed:** After stripping all Gemini-path schemas, the same `maxItems` error returned for the word "strategic."
+**I suspected:** Maybe I missed a schema.
+**I tested it:** Pulled the Lambda logs to find the exact operation:
 
 ```bash
-# Build
-npx esbuild handler.ts --bundle --platform=node \
-  --target=es2022 --format=esm --outfile=index.mjs
-
-# Verify fix is in the bundle
-grep -c "toGeminiSafeSchema" index.mjs
-# => 2
-
-# Deploy
-zip lambda.zip index.mjs
-aws lambda update-function-code \
-  --function-name "my-lambda" \
-  --zip-file fileb://lambda.zip
+aws logs filter-log-events \
+  --log-group-name "/aws/lambda/my-curriculum-gen-lambda" \
+  --filter-pattern "maxItems" --limit 5
 ```
 
-**What happened:** After manual deploy + cold start, the error stopped.
-**Takeaway:** The fix was always correct. The deployment pipeline was the problem.
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "anthropic_error",
+    "message": "output_config.format.schema: For 'array' type, property 'maxItems' is not supported"
+  }
+}
+```
+
+**What happened:** The error code was `anthropic_error`, not `gemini_error`. The failing operation was `generate-definition/anthropic` — an Anthropic Claude call, not Gemini.
+**Takeaway:** Anthropic's API **also** rejects `minItems`/`maxItems` in structured output schemas. The error message is identical. This isn't a Gemini-only problem.
+
+### Round 7: Confirm the Anthropic SDK passes constraints through
+
+**I noticed:** The Google provider strips `minItems`/`maxItems` via whitelist destructuring. Does the Anthropic provider also strip them?
+**I suspected:** No — if it did, the error wouldn't happen.
+**I tested it:** Read `@ai-sdk/anthropic@3.0.63`'s source in `node_modules`:
+
+```typescript
+// @ai-sdk/anthropic@3.0.63 — sends schema to API
+body: {
+  // ...
+  output_config: {
+    format: {
+      type: "json_schema",
+      schema: mode.schema,  // raw JSON Schema, no stripping
+    },
+  },
+}
+```
+
+**What happened:** The Anthropic provider passes the JSON Schema through unchanged to `output_config.format.schema`. There's no equivalent of Google's `convertJSONSchemaToOpenAPISchema` whitelist. `minItems` and `maxItems` survive the pipeline and hit Anthropic's API, which rejects them.
+**Takeaway:** Each AI SDK provider handles unsupported schema properties differently. Google strips them silently. Anthropic passes them through and lets the API reject them. You can't rely on the SDK to sanitize your schemas.
 
 ## The Root Cause
 
-Two-layer failure:
+Three things combined:
 
-1. **Gemini rejects `maxItems`** despite the docs claiming support. The error `output_config.format.schema: For 'array' type, property 'maxItems' is not supported` is real.
+1. **Both Gemini and Anthropic reject `minItems`/`maxItems`** in structured output JSON schemas, with the same error message: `output_config.format.schema: For 'array' type, property 'maxItems' is not supported`.
 
-2. **The Amplify sandbox silently failed to hotswap** the Lambda after code changes. The Lambda kept running a stale bundle that had neither our `toGeminiSafeSchema` workaround nor the current `@ai-sdk/google@3.0.52` which strips these properties in `convertJSONSchemaToOpenAPISchema`.
+2. **The AI SDK providers handle this inconsistently.** `@ai-sdk/google@3.0.52` silently strips `minItems`/`maxItems` via whitelist destructuring in `convertJSONSchemaToOpenAPISchema` — so Gemini calls usually *don't* fail even if your Zod schema has array constraints. `@ai-sdk/anthropic@3.0.63` passes the JSON Schema through unchanged — so Anthropic calls *do* fail.
 
-The confusing part: the Lambda *appeared* to be working (definition generation with Gemini succeeded) because those operations used schemas without `minItems`/`maxItems`. Only the spelling distractors schema with `.min(2).max(15)` triggered the error.
+3. **Zod compiles array constraints to JSON Schema properties** that look harmless:
+   - `.min(N)` → `minItems: N`
+   - `.max(N)` → `maxItems: N`
+   - `.length(N)` → `minItems: N, maxItems: N`
+
+   These are valid JSON Schema, but AI providers' structured output APIs don't support them.
+
+The most confusing part: the error message (`output_config.format.schema:...`) looks like a Gemini-specific parameter path, but Anthropic uses the *exact same format* when rejecting schemas through their `output_config.format.schema` parameter.
 
 ## The Fix
 
-### 1. Belt-and-suspenders: strip constraints from Zod schemas used with Gemini
+### Remove array constraints from all schemas, regardless of provider
+
+The cleanest and most reliable fix: don't put `.min()`, `.max()`, or `.length()` on arrays in any schema sent to any AI provider. Specify the count in the prompt text instead:
 
 ```typescript
-// Strip minItems/maxItems from JSON Schema before sending to Gemini.
-// The @ai-sdk/google provider's convertJSONSchemaToOpenAPISchema also
-// strips them, but we do it ourselves for defense in depth.
-import { generateText, jsonSchema, Output, zodSchema } from "ai";
+// Before (breaks with Gemini AND Anthropic):
+const schema = z.object({
+  definitions: z.array(z.string()).min(2).max(2),
+  partsOfSpeech: z.array(z.string()).min(1).max(5),
+});
+const prompt = "Generate definitions for the word.";
+
+// After (works everywhere):
+const schema = z.object({
+  definitions: z.array(z.string()),
+  partsOfSpeech: z.array(z.string()),
+});
+const prompt = "Generate exactly 2 definitions and 1-5 parts of speech.";
+```
+
+**Important:** Constraints on `z.string()` and `z.number()` compile to `minLength`/`maxLength` and `minimum`/`maximum` respectively — these *are* generally supported. Only **array** constraints (`minItems`/`maxItems`) cause problems.
+
+### Defense in depth: strip constraints before the SDK sees them
+
+If you can't remove constraints from your Zod schemas (e.g., they're shared with validation logic), strip them at the boundary:
+
+```typescript
+import { zodSchema, jsonSchema, generateText, Output } from "ai";
 import type { JSONSchema7 } from "json-schema";
 import { z } from "zod";
 
-function stripGeminiUnsupported(
+function stripArrayConstraints(
   schema: Record<string, unknown>
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -158,11 +218,11 @@ function stripGeminiUnsupported(
     if (Array.isArray(value)) {
       result[key] = value.map((item) =>
         typeof item === "object" && item !== null
-          ? stripGeminiUnsupported(item as Record<string, unknown>)
+          ? stripArrayConstraints(item as Record<string, unknown>)
           : item
       );
     } else if (typeof value === "object" && value !== null) {
-      result[key] = stripGeminiUnsupported(
+      result[key] = stripArrayConstraints(
         value as Record<string, unknown>
       );
     } else {
@@ -172,9 +232,9 @@ function stripGeminiUnsupported(
   return result;
 }
 
-function toGeminiSafeSchema<T>(zodType: z.ZodType<T>) {
+function toSafeSchema<T>(zodType: z.ZodType<T>) {
   const converted = zodSchema(zodType);
-  const cleaned = stripGeminiUnsupported(
+  const cleaned = stripArrayConstraints(
     converted.jsonSchema as Record<string, unknown>
   );
   return jsonSchema<T>(cleaned as JSONSchema7, {
@@ -185,45 +245,19 @@ function toGeminiSafeSchema<T>(zodType: z.ZodType<T>) {
     },
   });
 }
-```
 
-### 2. Remove array constraints from schemas used with Gemini
-
-The cleanest fix: don't put `.min()` / `.max()` / `.length()` on arrays in schemas sent to Gemini. Specify the count in the prompt text instead:
-
-```typescript
-// Before (breaks with Gemini):
-const schema = z.object({
-  items: z.array(z.object({ text: z.string() })).min(2).max(15),
+// Usage — works with any provider
+const result = await generateText({
+  model: anyProvider("any-model"),
+  output: Output.object({ schema: toSafeSchema(MyZodSchema) }),
+  prompt: "Generate 10 items.",
 });
-
-// After (works everywhere):
-const schema = z.object({
-  items: z.array(z.object({ text: z.string() })),
-});
-// Put the count in the prompt: "Generate 12 items"
 ```
-
-### 3. Verify your Lambda is running the code you think it is
-
-```bash
-# Download and inspect the deployed bundle
-aws lambda get-function --function-name "$FN" \
-  --query 'Code.Location' --output text \
-  | xargs curl -sL -o /tmp/lambda.zip
-unzip -o /tmp/lambda.zip -d /tmp/lambda
-grep -c "yourFunctionName" /tmp/lambda/index.mjs
-```
-
-If the count is 0, your code hasn't been deployed.
 
 ## What I Should Have Checked First
 
-Download the deployed Lambda bundle and verify the fix is in it. One `grep` on the deployed `index.mjs` would have immediately shown the fix was never deployed. Instead, I spent time tracing through the AI SDK's schema pipeline (which was working correctly), writing tests that proved the stripping logic works locally (which it does), and blaming the AI SDK (which was innocent).
+Pull the Lambda logs and check the **error code**, not just the error message. The error message `output_config.format.schema: For 'array' type, property 'maxItems' is not supported` looks identical across providers. Only the error code (`anthropic_error` vs `gemini_error`) reveals which provider is failing.
 
-The diagnostic hierarchy for "my fix doesn't work in production":
-1. **Is the fix deployed?** — download the artifact and grep for it
-2. **Is the fix running?** — add a log line, check the logs
-3. **Is the fix correct?** — write a test
+After fixing the Gemini schemas and deployment pipeline, I spent hours chasing the same error assuming it was still Gemini — because the message was identical. One `grep "anthropic_error"` on the logs would have immediately redirected the investigation.
 
-Most people start at 3. Start at 1.
+Broader lesson: when multiple providers share the same structured output API pattern (`output_config.format.schema`), they can produce identical-looking errors from completely different codepaths. Always check which provider the error originated from.
