@@ -1,55 +1,58 @@
 ---
 title: "AI SDK Google Provider Silently Strips minItems/maxItems From Schemas"
 pubDatetime: 2026-03-22T11:06:00Z
-description: "The Vercel AI SDK's Google provider silently strips minItems and maxItems from JSON schemas before sending them to Gemini, even though Gemini supports them natively."
+description: "The Vercel AI SDK's Google provider silently strips minItems and maxItems from JSON schemas before sending them to Gemini — which is actually correct, because Gemini rejects them despite the docs."
 tags:
   - ai-sdk
   - gemini
   - typescript
   - zod
+  - aws-lambda
 draft: false
 featured: false
 ---
 
 ## TL;DR
 
-The Vercel AI SDK's Google provider silently strips `minItems` and `maxItems` from JSON schemas before sending them to Gemini, even though Gemini's API supports them natively. If you use Zod's `.length()`, `.min()`, or `.max()` on arrays in structured output schemas, the constraints vanish and the model ignores them.
+The Vercel AI SDK's Google provider strips `minItems` and `maxItems` from JSON schemas via a whitelist destructuring pattern in `convertJSONSchemaToOpenAPISchema`. Despite Google's docs listing these as supported, the Gemini API rejects them with `output_config.format.schema: For 'array' type, property 'maxItems' is not supported`. The SDK's stripping is actually *correct* behavior. If you hit this error, your Lambda/server is likely running stale code that predates the stripping.
 
 ## Environment
 
-- `ai` 6.0.116 (Vercel AI SDK)
+- `ai` 6.0.134 (Vercel AI SDK)
 - `@ai-sdk/google` 3.0.52
+- `zod` 4.3.6
 - `gemini-2.5-flash` model
-- Node.js 22, macOS
+- Node.js 24.10.0, macOS 26.3.1
+- AWS Lambda (nodejs22.x) via AWS Amplify Gen 2 sandbox
 
 ## The Problem
 
-After switching several content generation operations from `gpt-5-mini` to `gemini-2.5-flash`, auto-generation started failing with:
+After switching content generation operations from `gpt-5-mini` to `gemini-2.5-flash`, auto-generation started failing with:
 
 ```
 output_config.format.schema: For 'array' type, property 'maxItems' is not supported
 ```
 
-The Zod schemas used `.length(10)` on arrays (which compiles to `minItems: 10, maxItems: 10` in JSON Schema), and Gemini was rejecting them.
+The Zod schema had `.min(2).max(15)` on an array, which compiles to `minItems: 2, maxItems: 15` in JSON Schema. Gemini rejected the request.
 
 ## The Investigation
 
-### Round 1: The obvious fix
+### Round 1: Check if Gemini supports the constraint
 
 **I noticed:** The error says `maxItems` is not supported for arrays.
 **I suspected:** Gemini's structured output mode doesn't support array length constraints.
 **I tested it:** Checked the [Gemini structured output docs](https://ai.google.dev/gemini-api/docs/json-mode).
 **What happened:** The docs explicitly list `minItems` and `maxItems` as supported properties for arrays.
-**Takeaway:** Gemini supports these constraints. The problem is somewhere between our code and the API.
+**Takeaway:** The docs say "supported" but the API says otherwise. Trust the error, not the docs.
 
-### Round 2: Tracing the schema pipeline
+### Round 2: Trace the AI SDK's schema pipeline
 
-**I noticed:** The AI SDK converts Zod schemas to JSON Schema internally via `Output.object({ schema: zodSchema })`, then the Google provider converts JSON Schema to OpenAPI 3.0 before sending to the API.
+**I noticed:** The AI SDK converts Zod schemas to JSON Schema via `Output.object({ schema })`, then the Google provider converts JSON Schema to OpenAPI 3.0 before sending to the API.
 **I suspected:** The conversion might be stripping the properties.
-**I tested it:** Read `@ai-sdk/google`'s `convertJSONSchemaToOpenAPISchema` function:
+**I tested it:** Read `@ai-sdk/google`'s `convertJSONSchemaToOpenAPISchema` function in `node_modules`:
 
 ```typescript
-// packages/google/src/convert-json-schema-to-openapi-schema.ts (v3.0.52)
+// @ai-sdk/google@3.0.52 — convertJSONSchemaToOpenAPISchema
 const {
   type,
   description,
@@ -67,171 +70,86 @@ const {
 ```
 
 **What happened:** The function uses destructuring as a whitelist. Only the properties listed above survive. `minItems`, `maxItems`, `minimum`, `maximum`, and `maxLength` are all silently dropped.
-**Takeaway:** The AI SDK is the bottleneck. Gemini never sees the constraints.
+**Takeaway:** The AI SDK in v3.0.52 *does* strip `maxItems`. So the error shouldn't happen with this version. Something else is going on.
 
-### Round 3: Wait, then why the error?
+### Round 3: Write and deploy a workaround
 
-**I noticed:** If the AI SDK strips `maxItems` before the request reaches Google, Google should never see it. But the error message (`output_config.format.schema: For 'array' type, property 'maxItems' is not supported`) looks like it comes from Google's API.
-**I suspected:** Maybe a stale Lambda deployment was running code from before the schema conversion was in place, or a different code path was being hit.
-**I tested it:** Verified there's only one copy of `@ai-sdk/google` (v3.0.52) in the project, and the compiled dist has the same stripping behavior.
-**What happened:** The stripping is confirmed in the compiled code. The initial error may have come from a transient deployment state.
-**Takeaway:** Regardless of the error's origin, the core issue stands: the AI SDK drops valid schema constraints that Gemini supports.
+**I noticed:** The AI SDK strips the properties, but the error keeps happening in production (Lambda).
+**I suspected:** Maybe the Lambda is running a different code path or older SDK version.
+**I tested it:** Wrote a `toGeminiSafeSchema` wrapper that strips `minItems`/`maxItems` before the SDK even sees them. Committed it. Forced a Lambda cold start via `aws lambda update-function-configuration` (updating a `FORCE_COLD_START` env var).
+**What happened:** The error *still* happened after the cold start.
+**Takeaway:** The cold start restarts the Lambda with its *existing deployed code* — it doesn't redeploy. The fix was committed to git but never made it to the Lambda.
 
-### Round 4: Is there an upstream fix?
+### Round 4: Prove the Lambda is running stale code
 
-**I noticed:** The AI SDK is open source at `vercel/ai`.
-**I suspected:** Maybe this was already fixed on `main`, or there was a `responseJsonSchema` code path that preserves the full schema.
-**I tested it:** Cloned the repo and searched the entire git history:
+**I noticed:** Every code path was verified locally. The stripping function works. The AI SDK's converter also strips. Two independent layers should prevent `maxItems` from reaching Gemini. Yet it does.
+**I suspected:** The Lambda isn't running the code I think it is.
+**I tested it:** Downloaded the actual deployed Lambda bundle:
 
 ```bash
-git log --all --oneline --grep="minItems"     # zero results
-git log --all --oneline --grep="maxItems"     # zero results
-git log --all --oneline --grep="responseJsonSchema"  # zero results
+# Download the Lambda deployment package
+aws lambda get-function \
+  --function-name "my-curriculum-gen-lambda" \
+  --query 'Code.Location' --output text \
+  | xargs curl -sL -o /tmp/lambda-code.zip
+
+# Extract and search
+unzip /tmp/lambda-code.zip -d /tmp/lambda-code
+grep -c "toGeminiSafeSchema" /tmp/lambda-code/index.mjs
+# => 0
 ```
 
-**What happened:** No one has ever worked on this. The conversion function hasn't been updated to pass through array or numeric constraints. The Google Vertex provider reuses the same code.
-**Takeaway:** This is a genuine gap in the AI SDK. Time to fix it upstream.
+**What happened:** Zero instances of `toGeminiSafeSchema` or `stripGeminiUnsupportedProps` in the deployed bundle. The workaround was committed but **never deployed**. The Amplify sandbox silently failed to hotswap.
+**Takeaway:** The Lambda was running code from before the fix. The cold start only recycled the *old* code. You must verify what code is actually deployed, not what's on disk.
+
+### Round 5: Verify the fix works end-to-end
+
+**I noticed:** The deployed bundle also lacked the `convertJSONSchemaToOpenAPISchema` improvements from v3.0.52 — the bundle was built with an older `@ai-sdk/google` version that didn't strip `maxItems`.
+**I suspected:** Building locally with current `node_modules` and deploying manually would fix it.
+**I tested it:** Built the Lambda bundle with esbuild, prepended the Amplify SSM shims, zipped, and uploaded:
+
+```bash
+# Build
+npx esbuild handler.ts --bundle --platform=node \
+  --target=es2022 --format=esm --outfile=index.mjs
+
+# Verify fix is in the bundle
+grep -c "toGeminiSafeSchema" index.mjs
+# => 2
+
+# Deploy
+zip lambda.zip index.mjs
+aws lambda update-function-code \
+  --function-name "my-lambda" \
+  --zip-file fileb://lambda.zip
+```
+
+**What happened:** After manual deploy + cold start, the error stopped.
+**Takeaway:** The fix was always correct. The deployment pipeline was the problem.
 
 ## The Root Cause
 
-`@ai-sdk/google`'s `convertJSONSchemaToOpenAPISchema` function converts JSON Schema 7 to OpenAPI 3.0 using a **whitelist destructuring pattern**. Any JSON Schema property not explicitly listed in the destructuring is silently discarded. The function preserved `minLength` for strings but missed:
+Two-layer failure:
 
-- `maxLength` (strings)
-- `minimum` / `maximum` (numbers)
-- `minItems` / `maxItems` (arrays)
+1. **Gemini rejects `maxItems`** despite the docs claiming support. The error `output_config.format.schema: For 'array' type, property 'maxItems' is not supported` is real.
 
-All of these are documented as supported by the Gemini API.
+2. **The Amplify sandbox silently failed to hotswap** the Lambda after code changes. The Lambda kept running a stale bundle that had neither our `toGeminiSafeSchema` workaround nor the current `@ai-sdk/google@3.0.52` which strips these properties in `convertJSONSchemaToOpenAPISchema`.
+
+The confusing part: the Lambda *appeared* to be working (definition generation with Gemini succeeded) because those operations used schemas without `minItems`/`maxItems`. Only the spelling distractors schema with `.min(2).max(15)` triggered the error.
 
 ## The Fix
 
-The fix is a two-line addition to the destructuring plus six `if` blocks to pass the values through. Here's a minimal reproduction:
-
-### Setup
-
-```bash
-mkdir ai-sdk-schema-test && cd ai-sdk-schema-test
-npm init -y
-npm install ai@6.0.116 @ai-sdk/google@3.0.52 zod@3.24.4
-```
-
-### Reproduce the bug
+### 1. Belt-and-suspenders: strip constraints from Zod schemas used with Gemini
 
 ```typescript
-// show-stripped-schema.ts
-import { zodSchema } from "ai";
-import { z } from "zod";
-
-// This is what a typical structured output schema looks like
-const schema = z.object({
-  questions: z.array(
-    z.object({
-      prompt: z.string(),
-      answer: z.boolean(),
-    })
-  ).length(10), // produces minItems: 10, maxItems: 10
-});
-
-// Convert to JSON Schema (what the AI SDK does internally)
-const converted = zodSchema(schema);
-console.log("Zod -> JSON Schema:");
-console.log(JSON.stringify(converted.jsonSchema, null, 2));
-// Shows: "minItems": 10, "maxItems": 10  <-- present here
-
-// Now simulate what @ai-sdk/google does:
-// (simplified version of convertJSONSchemaToOpenAPISchema)
-function convertToOpenAPI(jsonSchema: Record<string, any>): Record<string, any> {
-  const { type, properties, items, required, description } = jsonSchema;
-  // ^ minItems and maxItems are NOT destructured, so they're dropped
-  const result: Record<string, any> = {};
-  if (type) result.type = type;
-  if (description) result.description = description;
-  if (required) result.required = required;
-  if (properties) {
-    result.properties = Object.fromEntries(
-      Object.entries(properties).map(([k, v]) => [k, convertToOpenAPI(v as any)])
-    );
-  }
-  if (items) result.items = convertToOpenAPI(items);
-  return result;
-}
-
-const openapi = convertToOpenAPI(converted.jsonSchema as any);
-console.log("\nAfter OpenAPI conversion (sent to Gemini):");
-console.log(JSON.stringify(openapi, null, 2));
-// minItems and maxItems are GONE
-```
-
-### The fix (in `@ai-sdk/google`)
-
-```diff
-  const {
-    type,
-    description,
-    required,
-    properties,
-    items,
-    allOf,
-    anyOf,
-    oneOf,
-    format,
-    const: constValue,
--   minLength,
-    enum: enumValues,
-+   minLength,
-+   maxLength,
-+   minimum,
-+   maximum,
-+   minItems,
-+   maxItems,
-  } = jsonSchema;
-
-  // ... existing passthrough for minLength ...
-
-  if (minLength !== undefined) {
-    result.minLength = minLength;
-  }
-+ if (maxLength !== undefined) {
-+   result.maxLength = maxLength;
-+ }
-+ if (minimum !== undefined) {
-+   result.minimum = minimum;
-+ }
-+ if (maximum !== undefined) {
-+   result.maximum = maximum;
-+ }
-+ if (minItems !== undefined) {
-+   result.minItems = minItems;
-+ }
-+ if (maxItems !== undefined) {
-+   result.maxItems = maxItems;
-+ }
-```
-
-PR: [vercel/ai#13721](https://github.com/vercel/ai/pull/13721)
-
-### Workaround (until the PR ships)
-
-Strip the constraints yourself before passing to `Output.object()`, keeping Zod validation for the response:
-
-```typescript
+// Strip minItems/maxItems from JSON Schema before sending to Gemini.
+// The @ai-sdk/google provider's convertJSONSchemaToOpenAPISchema also
+// strips them, but we do it ourselves for defense in depth.
 import { generateText, jsonSchema, Output, zodSchema } from "ai";
+import type { JSONSchema7 } from "json-schema";
 import { z } from "zod";
 
-function toGeminiSafeSchema<T>(zodType: z.ZodType<T>) {
-  const converted = zodSchema(zodType);
-  const cleaned = stripArrayConstraints(
-    converted.jsonSchema as Record<string, unknown>
-  );
-  return jsonSchema<T>(cleaned, {
-    validate: (value) => {
-      const parsed = zodType.safeParse(value);
-      if (parsed.success) return { success: true, value: parsed.data };
-      return { success: false, error: parsed.error };
-    },
-  });
-}
-
-function stripArrayConstraints(
+function stripGeminiUnsupported(
   schema: Record<string, unknown>
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
@@ -240,11 +158,13 @@ function stripArrayConstraints(
     if (Array.isArray(value)) {
       result[key] = value.map((item) =>
         typeof item === "object" && item !== null
-          ? stripArrayConstraints(item as Record<string, unknown>)
+          ? stripGeminiUnsupported(item as Record<string, unknown>)
           : item
       );
     } else if (typeof value === "object" && value !== null) {
-      result[key] = stripArrayConstraints(value as Record<string, unknown>);
+      result[key] = stripGeminiUnsupported(
+        value as Record<string, unknown>
+      );
     } else {
       result[key] = value;
     }
@@ -252,21 +172,58 @@ function stripArrayConstraints(
   return result;
 }
 
-// Usage:
-const mySchema = z.object({
-  questions: z.array(z.object({ text: z.string() })).length(10),
+function toGeminiSafeSchema<T>(zodType: z.ZodType<T>) {
+  const converted = zodSchema(zodType);
+  const cleaned = stripGeminiUnsupported(
+    converted.jsonSchema as Record<string, unknown>
+  );
+  return jsonSchema<T>(cleaned as JSONSchema7, {
+    validate: (value) => {
+      const parsed = zodType.safeParse(value);
+      if (parsed.success) return { success: true, value: parsed.data };
+      return { success: false, error: parsed.error };
+    },
+  });
+}
+```
+
+### 2. Remove array constraints from schemas used with Gemini
+
+The cleanest fix: don't put `.min()` / `.max()` / `.length()` on arrays in schemas sent to Gemini. Specify the count in the prompt text instead:
+
+```typescript
+// Before (breaks with Gemini):
+const schema = z.object({
+  items: z.array(z.object({ text: z.string() })).min(2).max(15),
 });
 
-const result = await generateText({
-  model: google("gemini-2.5-flash"),
-  output: Output.object({
-    schema: toGeminiSafeSchema(mySchema), // cleaned for Gemini
-  }),
-  prompt: "Generate exactly 10 questions about TypeScript.",
+// After (works everywhere):
+const schema = z.object({
+  items: z.array(z.object({ text: z.string() })),
 });
-// Zod .length(10) still validates the response after generation
+// Put the count in the prompt: "Generate 12 items"
 ```
+
+### 3. Verify your Lambda is running the code you think it is
+
+```bash
+# Download and inspect the deployed bundle
+aws lambda get-function --function-name "$FN" \
+  --query 'Code.Location' --output text \
+  | xargs curl -sL -o /tmp/lambda.zip
+unzip -o /tmp/lambda.zip -d /tmp/lambda
+grep -c "yourFunctionName" /tmp/lambda/index.mjs
+```
+
+If the count is 0, your code hasn't been deployed.
 
 ## What I Should Have Checked First
 
-Read the `convertJSONSchemaToOpenAPISchema` source in `node_modules/@ai-sdk/google`. The whitelist destructuring pattern on line 30 immediately reveals which properties survive and which are dropped. A 10-second read of that function would have explained the entire issue.
+Download the deployed Lambda bundle and verify the fix is in it. One `grep` on the deployed `index.mjs` would have immediately shown the fix was never deployed. Instead, I spent time tracing through the AI SDK's schema pipeline (which was working correctly), writing tests that proved the stripping logic works locally (which it does), and blaming the AI SDK (which was innocent).
+
+The diagnostic hierarchy for "my fix doesn't work in production":
+1. **Is the fix deployed?** — download the artifact and grep for it
+2. **Is the fix running?** — add a log line, check the logs
+3. **Is the fix correct?** — write a test
+
+Most people start at 3. Start at 1.
