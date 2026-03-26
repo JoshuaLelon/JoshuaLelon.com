@@ -13,7 +13,7 @@ featured: false
 
 ## TL;DR
 
-With `output: "standalone"` in Next.js on AWS Amplify, `.env.production` at the project root is **not included** in the deployment artifacts (`baseDirectory: .next`), so non-`NEXT_PUBLIC_` env vars are unavailable at runtime. The `env` block in `next.config.js` inlines them at build time, but it uses DefinePlugin which exposes values to **both** client and server bundles — leaking secrets like signing keys.
+With `output: "standalone"` in Next.js on AWS Amplify, `.env.production` at the project root is **not included** in the deployment artifacts (`baseDirectory: .next`), so non-`NEXT_PUBLIC_` env vars are unavailable at runtime. The only fix that works is the `env` block in `next.config.js`, which inlines values at build time via DefinePlugin. It exposes values to both client and server compilation, but they only appear in bundles that reference them — so server-only API route secrets stay server-side in practice.
 
 ## Environment
 
@@ -98,7 +98,19 @@ fi
 
 **Takeaway:** `.next/standalone/` is where `server.js` lives, but Amplify's SSR adapter doesn't necessarily run the server from that directory. The adapter repackages the deployment, and the file ended up in the wrong place.
 
-### Round 4: Understanding the deployment topology
+### Round 4: Write server-env.json and load in instrumentation.ts
+
+**I noticed:** Copying `.env.production` to a specific subdirectory was fragile — we were guessing where Amplify's Lambda runs from.
+
+**I suspected:** If we wrote a JSON file directly into `.next/` (which IS the deployment artifact root), and loaded it in Next.js's `instrumentation.ts` hook (which runs at server startup before any routes), we could populate `process.env` without any bundler involvement.
+
+**I tested it:** Wrote a build script step to generate `.next/server-env.json` with all non-`NEXT_PUBLIC_` vars, and added loading code to `instrumentation.ts` using `process.cwd()` + `.next/server-env.json`.
+
+**What happened:** Deployed and tested — still failed. The Amplify Lambda's `process.cwd()` doesn't resolve to where we expect, so the file read either fails silently (ENOENT caught) or reads from the wrong location.
+
+**Takeaway:** Amplify's SSR adapter completely controls the Lambda's filesystem layout and working directory. We can't rely on file paths being predictable at runtime. The only reliable mechanism is build-time inlining.
+
+### Round 5: Understanding the deployment topology
 
 **I noticed:** The Amplify build artifacts are configured as:
 
@@ -141,9 +153,7 @@ The `env` block in `next.config.js` bypasses this distinction by using DefinePlu
 
 ## The Fix
 
-There are two approaches, depending on your security posture:
-
-### Option A: Use the `env` block (pragmatic)
+Use the `env` block in `next.config.js`:
 
 ```js
 // next.config.js
@@ -155,58 +165,21 @@ const nextConfig = {
 };
 ```
 
-This inlines the value at build time via DefinePlugin. The value is available in both client and server bundles, but it only appears in the compiled output of files that reference `process.env.MY_SIGNING_KEY`. If only server-side code (like an API route) references it, it won't appear in client bundles in practice — but there's no guarantee a future import chain won't pull it in.
+This is the **only approach that works** on Amplify with standalone mode. It inlines the value at build time via DefinePlugin.
 
-### Option B: Write a server-env file into `.next/` (secure)
+DefinePlugin replaces `process.env.MY_SIGNING_KEY` in compiled output wherever it appears. Critically, the replacement only happens in files that reference the variable. If only server-side code (like an API Route Handler) references it, the value only appears in server bundles — client bundles won't contain it because no client code references it.
 
-Write server-only env vars into a JSON file inside `.next/` after the build, then load it at server startup via `instrumentation.ts`:
+This is a weaker guarantee than `NEXT_PUBLIC_` enforcement (which is a bundler-level boundary), but it's the only game in town for Amplify + standalone.
 
-**Build script (after `next build`):**
+### What doesn't work
 
-```bash
-#!/bin/bash
-# Write server-only env vars into the deployment artifacts
-python3 -c "
-import json
-env = {}
-for line in open('.env.production'):
-    line = line.strip()
-    if line and not line.startswith('#') and '=' in line:
-        key, _, value = line.partition('=')
-        if not key.startswith('NEXT_PUBLIC_'):
-            env[key] = value
-json.dump(env, open('.next/server-env.json', 'w'))
-print(f'Wrote {len(env)} server env vars to .next/server-env.json')
-"
-```
+We tested two alternatives that both failed:
 
-**instrumentation.ts:**
+1. **Copying `.env.production` into `.next/standalone/`** — the file was confirmed present in the build output, but Amplify's SSR adapter repackages the deployment and the Lambda doesn't run from that directory.
 
-```ts
-export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    try {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const envPath = path.join(process.cwd(), ".next", "server-env.json");
-      const env = JSON.parse(fs.readFileSync(envPath, "utf8"));
-      for (const [key, value] of Object.entries(env)) {
-        if (!process.env[key]) {
-          process.env[key] = value as string;
-        }
-      }
-    } catch (error: unknown) {
-      // ENOENT is expected in dev — env vars come from .env.local
-      if (!(error instanceof Error) || !("code" in error) ||
-          (error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-    }
-  }
-}
-```
+2. **Writing `server-env.json` into `.next/` and loading it in `instrumentation.ts`** — the file was in the deployment artifacts, but `process.cwd()` in the Amplify Lambda doesn't resolve to where we expected, so the file read failed silently.
 
-This keeps secrets out of any JavaScript bundle. The JSON file lands inside `.next/` which IS included in Amplify's deployment artifacts.
+Both approaches fail because Amplify's SSR adapter is a black box — you can't predict or control the Lambda's filesystem layout or working directory at runtime.
 
 ## What I Should Have Checked First
 
