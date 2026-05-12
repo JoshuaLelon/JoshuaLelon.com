@@ -76,7 +76,7 @@ The whole point is to start as close to the finish line as possible — *without
 - **React** (Stage 2+) — the runtime the rest of the defaults are built around. If you swap React out, you'll also need to swap the component library and state approach to match — `shadcn/ui` and `React hooks` are React-specific.
 - **Tailwind + shadcn/ui** (Stage 3+) — styling and components. Tailwind alone is framework-agnostic; shadcn/ui is React-specific (community ports exist for Svelte/Solid/Vue). Swap to Open Props, Pico.css, or any other styling approach if you prefer something else.
 - **React hooks** — `useState`, `useReducer`, `useContext` (Stage 3+) — built-in client state, zero new dependencies. Swap to Zustand, Nano Stores, signals, or whatever your shape needs.
-- **Routing framework** (Stage 4) and **backend stack** (Stage 5) — chosen at those stages; the post leaves these open.
+- **Routing framework** (Stage 4) and **backend stack** (Stage 5) — chosen at those stages from a menu of options, with no default. The right choice there depends on what your app actually needs to do; the pipeline doesn't presume to pick for you.
 
 Each stage's prompt enforces what's allowed and what's off-limits, so the agent can't accidentally pull a future-stage dependency into an earlier one — and when you swap a default, you do it in one place.
 
@@ -105,6 +105,8 @@ By the end of Stage 5, every narration has been replaced. The count of remaining
 One rule: **narrations are version-controlled like code**, not comments to be deleted casually. They're the spec. Don't delete one without replacing it with implementation and a test.
 
 ## The pipeline
+
+Stages 1–3 are the load-bearing part. They produce a tested, styled, fully-demoable prototype with mocked everything in hours, not days — the artifact you'd put in front of a real user before any backend exists. Stages 4–6 are the on-ramp from prototype to production: sketched with menu options rather than defaults, because the right choices there depend on what your app actually needs to do and where it'll live.
 
 ### Stage 1: HTML wireframe
 
@@ -324,9 +326,18 @@ Output:
 
 A routing framework enters. The network is still MSW. In dev, the app itself runs against the mock handlers — this means the prototype is *demoable* to real users before any backend exists. Existing tests don't change.
 
-- **Tech introduced:** a routing framework of your choice (Next.js, React Router, SvelteKit, Astro, Remix, TanStack Router — pick one).
+- **Tech introduced:** a routing framework of your choice (menu below).
 - **Off-limits:** real backend, real database, auth provider. `tests/handlers.ts` is still the entire network layer.
 - **Narrations:** in Build, replace any narration whose behavior depends on framework features (loading states, route transitions, redirects, suspense boundaries, error boundaries, auth-gated routes, server-rendered initial state). Tests for them land in Add tests. Backend-dependent narrations stay.
+
+**Framework menu.** No prescribed default — pick by what your app needs to do:
+
+- **Next.js App Router** — the most batteries-included option. Server components, image optimization, file-based routing, first-class Vercel deployment. Strong choice if you want minimal infrastructure decisions and Vercel-style hosting.
+- **React Router v7 (framework mode)** — closest to plain React, less opinionated. Strong choice if you want flexibility and a smaller surface area.
+- **TanStack Router** — newer, with route-level type safety better than either of the above. Strong choice if type-safe routing is the property you care most about.
+- **Astro (with React islands)** — content-first, hydrates interactivity selectively. Strong choice if most of your app is content with sprinkles of interaction.
+
+The only hard constraint: the framework migration must preserve accessible names. Your Stage 2/3 Playwright tests are anchored to roles and labels, not to component identities — if those don't move, the tests keep passing.
 
 #### Build
 
@@ -384,9 +395,18 @@ Output:
 
 This is where the whole approach pays off. To land a real backend endpoint, I implement the route, **delete its handler from `tests/handlers.ts`**, and re-run the e2e suite. The handler removal is the cutover. The tests pass for the same reason they always did — the contract didn't change, just the implementation behind it. Backend lands one route at a time, and each landing is a one-line deletion from a file. Any backend-dependent narration still in the frontend is implemented alongside its corresponding route in this same iteration.
 
-- **Tech introduced:** a backend stack of your choice (runtime, web framework, database, ORM/query layer, auth provider — as needed).
+- **Tech introduced:** a backend stack of your choice (menu below).
 - **Off-limits:** changing the network contract without flagging it. If the real backend would naturally have a different request/response shape than the existing MSW handler, stop and reconcile the contract first.
 - **Narrations:** any narration tied to this iteration's endpoint is implemented in Build; its test lands in Add tests. By the end of Stage 5, the narration count is zero.
+
+**Backend menu.** No prescribed default — pick by where the app needs to run and how much infrastructure you want to operate:
+
+- **Self-hosted Node / Bun + ORM + DB** — a runtime (Node or Bun) plus a server framework (Hono, Elysia, Express, Fastify), an ORM (Drizzle, Prisma, Kysely), and a database (SQLite for local, Postgres for production). Full type safety end-to-end with React; full control over hosting and cost.
+- **Managed BaaS** — Convex, Supabase, Firebase. Auth + database + functions bundled. Convex is the most React-native (functions are TypeScript, queries are reactive by default). Supabase is the closest drop-in for "Postgres + auth + storage." Firebase has the best mobile story.
+- **Edge / serverless** — Cloudflare Workers, AWS Lambda, Vercel Functions, Deno Deploy. Pay-per-request, no servers to keep running. Strong choice if traffic is spiky or you don't want to operate infrastructure.
+- **Hybrid** — e.g., Supabase for auth + DB, Workers or Lambdas for heavier compute. The most common production pattern in practice.
+
+The contract you have to keep is whatever was in the MSW handler. Pick the backend that lets you preserve the request/response shape with the least ceremony, and you'll be replacing handlers one at a time without touching the frontend.
 
 #### Build
 
