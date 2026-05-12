@@ -14,7 +14,15 @@ featured: false
 
 ## TL;DR
 
-I build apps in five stages — HTML wireframe → click-through prototype → styled mockup → full frontend with mocked backend → real backend, one route at a time. **The same Playwright e2e tests run at every stage**, because they're anchored to accessible roles and labels (which survive every rewrite) and to MSW network handlers (which survive every backend swap). I don't write unit tests until the surface stops moving.
+I build apps in five stages:
+
+1. **HTML wireframe** — static `.html` files linked with `<a href>`s. No CSS, no JS, no framework, no tests.
+2. **Click-through prototype** — same raw HTML, plus an inline `<script>` to handle form submits and swap screens. Still no CSS, no framework. The first Playwright e2e test lands here.
+3. **Styled mockup** — real styling, real component library, real client-side state. Network calls are mocked with [MSW](https://mswjs.io). No routing framework yet, no real backend. Adds a second wave of e2e tests: empty states, error paths, dropdowns populating, toast-on-save — every edge case the styled UI now has surface for.
+4. **Full frontend with mocked backend** — real framework (I use React Router), real routing, real client state. Network is still MSW — no real server, no database. No new tests; the Stage 3 suite carries over unchanged.
+5. **Real backend, one route at a time** — implement the route (Prisma, whatever), delete its MSW handler, re-run the suite. Frontend code is untouched. No new tests; the existing e2e tests are now hitting real endpoints.
+
+**The same Playwright e2e tests run at every stage**, because they're anchored to accessible roles and labels (which survive every rewrite) and to MSW network handlers (which survive every backend swap). I don't write unit tests until the surface stops moving.
 
 ## Why bother with a process
 
@@ -26,14 +34,16 @@ I want a process where the tests grow with the product. Coarse at the start, gra
 
 ## The insight
 
-Most testing advice falls apart in practice because **the artifact changes too fast for the tests to keep up**. You write an integration test against `signInWithEmail()`, you refactor the auth module, the test is now a paperweight.
+Most testing advice falls apart in practice because **tests break for the wrong reasons**. You write an integration test against `signInWithEmail()`, you refactor the auth module, the test is now a paperweight — even though the product behavior didn't change at all. That's the failure mode: the test was coupled to an implementation detail, not to anything a user or a caller would notice.
 
-But two things turn out to be remarkably stable across the entire lifecycle of a feature:
+The fix isn't to find things that never change. It's to anchor tests to the things that change *only when product behavior changes*. Two qualify:
 
-1. **What the user sees and clicks.** "The button named *Submit*." "The input labelled *Email*." "The heading *Welcome back*." These don't change when you swap React for Svelte, or HTML for a real framework. They only change when the *product* changes — and if the product changes, the test *should* fail.
-2. **The shape of the data crossing the network.** `POST /notes` takes `{title, content}` and returns `{id, title, content, createdAt}`. That contract is the same whether the backend is a `<script>` tag mocking it locally, an MSW handler, or a real Postgres-backed endpoint.
+1. **What the user sees and clicks.** "The button named *Submit*." "The input labelled *Email*." "The heading *Welcome back*." The URL in the address bar counts too — it's something the user perceives and shares. When these change, the product changed: somebody renamed a button, removed a field, reworded a flow, restructured the routes. The test *should* fail; that's the whole point of having it. When you swap React for Svelte, or rewrite the HTML, these don't move, so the test doesn't either.
+2. **The I/O at the system boundary.** `POST /notes` takes `{title, content}` and returns `{id, title, content, createdAt}`. The outbound `POST https://hooks.slack.com/...` carries `{channel, text}`. The boundary isn't "frontend ↔ backend" — it's "code I own ↔ code I don't." When any of those contracts change, somebody altered what the system does and the test *should* fail. When the implementation behind them changes — `<script>` tag, MSW handler, real Postgres — the contracts hold and the test rides along.
 
-If you anchor every test to those two things — accessible roles + network shapes — your tests survive every implementation rewrite underneath them. That's the whole game.
+That's the whole game: tests fail when the product changes and stay quiet when it doesn't. Coupling them to roles, URLs, and boundary I/O is what buys you that property.
+
+Time-dependent behavior is the same trick applied to the clock. Playwright's `page.clock` lets you fast-forward deterministically, so "autosave fires after 2s" becomes `clock.fastForward(2000)` followed by the assertion you'd write for any other state change. Mocking time is just mocking another input.
 
 ## The pipeline
 
@@ -91,7 +101,7 @@ The e2e tests remain the load-bearing contract. The unit tests are scaffolding a
 ## Habits that keep me honest
 
 - **No new flow merges without a Stage-1 e2e**, even when the screens are still HTML. The first test is the hard one to write. Once it exists, AI extends it mechanically.
-- **`tests/handlers.ts` is version-controlled from Stage 2 onward.** It's the inventory of "what does the backend owe the frontend." When I do Stage 4, I'm literally deleting from this file. It's a checklist that maintains itself.
+- **`tests/handlers.ts` is version-controlled from Stage 2 onward.** It's the inventory of "what does the backend owe the frontend." When I do Stage 4, I'm literally deleting from this file. It's a checklist that maintains itself. Handlers for third-party services I don't own — Slack, Stripe, SendGrid — never get deleted; they mark the permanent system boundary, not the migration backlog.
 - **No unit tests before Stage 5.** They encode an implementation that's still moving. Every refactor breaks them and I stop trusting them. Skip until the shape is stable.
 - **AI is best at Stages 0–2. I'm best at Stage 4.** Let it generate the wireframes and the first happy-path e2e — it's good at this; the locators are obvious from the markup. I write the route handlers and the persona/fixture setup, because that's where domain decisions live and where the trade-offs aren't legible without context.
 
