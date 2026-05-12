@@ -17,7 +17,7 @@ I build apps in six stages:
 | Stage | Summary | Tech introduced | Tests added |
 |---|---|---|---|
 | **1. HTML wireframe** | **Adds navigation**: static `.html` files linked with `<a>`s | HTML (Wireframe HTML subset) | Structural lint |
-| **2. Click-through prototype** | **Adds state**: minimum vanilla JS makes typed input observable on the next screen | inline `<script>` JS, Playwright. | One Playwright e2e per flow (role/label locators) |
+| **2. Click-through prototype** | **Adds single-hop state**: minimum vanilla JS makes typed input observable on the next screen | inline `<script>` JS, Playwright. | One Playwright e2e per flow (role/label locators) |
 | **3. Styled mockup** | **Adds network/style**: real styling, real client state, MSW-mocked network; client-only behaviors[\*](#narration-as-first-class-scaffolding) get implemented | Tailwind + shadcn/ui, React hooks, MSW. | Edge cases the styled UI now affords: empty states, error paths, autosuggest, toasts, etc |
 | **4. Full prototype with mocked backend** | **Adds routing**: framework enters; app runs against MSW handlers in dev — demoable to users without a backend | A routing framework of your choice. | Tests for the framework-dependent behaviors implemented this stage. |
 | **5. Real backend, one route at a time** | **Adds backend**: implement a route, delete its MSW handler, re-run the suite — frontend untouched | A backend stack of your choice. | None new — the existing e2e tests now hit real endpoints. |
@@ -212,7 +212,7 @@ await expect(page.getByRole('heading', { name: 'My note' })).toBeVisible()
 
 Without that JS, the only thing a test could check is link navigation — which the Stage 1 lint already proves statically. The JS is what gives Stage 2's tests something *new* to assert. Each test is maybe twenty lines and becomes the load-bearing contract for its flow for the rest of the project's life.
 
-The state model here is **pairwise**: typed values flow as a side effect of one navigation, then evaporate. Hit back, refresh, or take a different path and they're gone. No store, no persistence, no cross-screen visibility. That's deliberate — it's the simplest model that's behaviorally testable, and it's enough to validate that the *flow* works before anything richer enters.
+The state model here is **single-hop**: typed values flow as a side effect of one navigation, then evaporate. Hit back, refresh, or take a different path and they're gone. No store, no persistence, no cross-screen visibility. That's deliberate — it's the simplest model that's behaviorally testable, and it's enough to validate that the *flow* works before anything richer enters.
 
 - **Tech introduced:** Vanilla JavaScript (inline `<script>` only) at Build; Playwright at Add tests.
 - **Off-limits during Build:** CSS, any framework, component libraries, bundlers, state libraries, npm dependencies in the app itself (Playwright is dev-only).
@@ -269,7 +269,7 @@ Output:
 
 Real styling, real client-side state, real component patterns. The inline `<script>` becomes proper code. The network is mocked with [MSW](https://mswjs.io). Default handlers live in `tests/handlers.ts` — that file is now my materialized backend backlog. The Stage 2 tests still pass, because the roles and labels didn't change.
 
-The state model jumps a level. Stage 2 was pairwise (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level; MSW-mocked endpoints hold "persisted" state on the other side of the network seam. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, autosuggest, and any cross-screen invariant the tests want to assert.
+The state model jumps a level. Stage 2 was single-hop (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level; MSW-mocked endpoints hold "persisted" state on the other side of the network seam. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, autosuggest, and any cross-screen invariant the tests want to assert.
 
 - **Tech introduced:** Tailwind + shadcn/ui for styling and components (default — swap by editing the prompt), React hooks (`useState`, `useReducer`, `useContext`) for client state (default), MSW for network mocking (locked in).
 - **Off-limits:** routing framework, real backend, database, auth provider, server-side rendering.
