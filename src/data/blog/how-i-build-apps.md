@@ -28,6 +28,8 @@ I build apps in five stages:
 
 Two things matter when you build with AI: taste (what you're building) and evals (knowing it works). Everything else is plumbing.
 
+This post is mostly about evals. The taste half — talking to people, watching them stumble through a flow, throwing away an idea that doesn't survive contact with a human — happens *around* the pipeline below, especially in the early stages. The pipeline doesn't replace that work; it keeps the cost of being wrong low enough that you stay willing to do it.
+
 The plumbing problem is that if I don't bake tests in from the start, I never do. Or I do them badly. The temptation is always to "ship first, test later," and later never comes. But the opposite temptation is just as bad: kitchen-sink the testing on day one, write twenty unit tests against scaffolding I'll throw away next week, and burn out before I've validated anything real.
 
 I want a process where the tests grow with the product. Coarse at the start, granular when the shape stabilizes. Cheap enough at every stage that I don't have an excuse to skip them.
@@ -51,13 +53,15 @@ Time-dependent behavior is the same trick applied to the clock. Playwright's `pa
 
 A folder of static `.html` files, one per screen, linked with `<a href>`s. No JS. No framework. No tests yet.
 
-This is the cheapest possible artifact for arguing about the *flow*. AI is excellent at this — prompt it to give you five linked screens with the right form fields and you're done in two minutes. The point of this stage is to click through and feel whether the flow is right. Static HTML beats Figma here because you can actually navigate it. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post for the framing.)
+This is the cheapest possible artifact for arguing about the *flow* — and arguing about the flow is where taste shows up. AI is excellent at producing the artifact: prompt it for five linked screens with the right form fields and you're done in two minutes. The harder part is putting the result in front of a human who isn't you and watching them try to use it. Static HTML beats Figma here because they can actually navigate it. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post for the framing.)
 
-If the flow is wrong, you'd rather discover it now than after you've wired up state management.
+If the flow is wrong, you'd rather find out now than after you've wired up state management. It's normal to throw Stage 0 away and redo it two or three times before Stage 1 makes any sense.
 
 ### Stage 1: First e2e test
 
-Once a flow feels right, I write *one* Playwright test per flow. It walks every screen using only role/label locators:
+Once a flow feels right, I write *one* Playwright test per flow — and I'm ruthless about which flows count at this stage. The critical path only: login and the one money flow. Settings pages, edge-case forms, admin views — those wait. The 80/20 isn't just "e2e before unit"; it's also "the one flow that has to work before any of the other flows."
+
+The test walks every screen using only role/label locators:
 
 ```ts
 await page.getByLabel('Title').fill('My note')
@@ -78,7 +82,7 @@ The Stage 1 test still passes, because the roles and labels didn't change. I add
 
 ### Stage 3: Full prototype, mocked backend
 
-Real framework (I've been using React Router). Real routing, real client state. The network is still MSW. In dev, the app itself runs against the mock handlers — this means the prototype is *demoable* to users before any backend exists.
+Real framework (I've been using React Router). Real routing, real client state. The network is still MSW. In dev, the app itself runs against the mock handlers — this means the prototype is *demoable* to users before any backend exists. This is the second big taste-checkpoint: if the demo tells you you're building the wrong thing, the cost of changing course is still a frontend-only rewrite. Once Stage 4 lands, that cost goes up sharply, so spend real time here.
 
 Tests don't change.
 
@@ -94,9 +98,9 @@ That's it. The handler removal is the cutover. The tests pass for the same reaso
 
 ### Stage 5: Sink toward integration and unit
 
-Only now do I write the cheaper, more granular tests — and only for the bits of the e2e that are too expensive to iterate on. The signal is usually "we keep regressing the same subtle edge case and the e2e is too coarse to point at it." Date parsing, permission branches, reducer transitions.
+Only now do I write the cheaper, more granular tests — and "now" is later than most engineers think. The trigger is *product*, not technical: I have users, the shape of the product has stopped moving, and I can name the parts of the system that are load-bearing for revenue or retention. Until you have that, the surface is still in motion and unit tests are encoding decisions that haven't been made yet. Most projects never reach Stage 5, and that's fine — the e2e suite carries them.
 
-The e2e tests remain the load-bearing contract. The unit tests are scaffolding around the parts of it that need finer-grained pressure.
+When you do get here, the signal that pulls you down a level is usually "we keep regressing the same subtle edge case and the e2e is too coarse to point at it." Date parsing, permission branches, reducer transitions. The e2e tests remain the load-bearing contract. The unit tests are scaffolding around the parts of it that need finer-grained pressure.
 
 ## Habits that keep me honest
 
@@ -108,5 +112,7 @@ The e2e tests remain the load-bearing contract. The unit tests are scaffolding a
 ## The thing I want you to take from this
 
 The way tests typically get bolted on after the fact is downstream of one root cause: **most tests are coupled to implementation details that change.** If you decouple them — anchor everything to the two things that don't change (accessibility surface + network contracts) — the tests get cheap enough that there's no excuse to defer them. They become the spine of the build process, not a tax you pay at the end.
+
+That spine is the evals half. The taste half — figuring out what's worth building in the first place — is what the pipeline is supposed to *make room for*, by keeping the cost of being wrong low at every stage. Stage 0 lets you be wrong about the flow for free. Stage 3 lets you be wrong about the product for the price of a frontend rewrite. Stage 4 is when being wrong starts to hurt, which is exactly when you should be most confident.
 
 Start coarse. Stay coarse until the product stops moving. Then, and only then, sink lower.
