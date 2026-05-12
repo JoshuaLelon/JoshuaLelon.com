@@ -18,14 +18,14 @@ I build apps in six stages:
 |---|---|---|---|
 | **1. HTML wireframe** | **Adds navigation**: static `.html` files linked with `<a>`s | HTML (Wireframe HTML subset) | Structural lint |
 | **2. Click-through prototype** | **Adds state**: minimum vanilla JS makes typed input observable on the next screen | inline `<script>` JS, Playwright. | One Playwright e2e per flow (role/label locators) |
-| **3. Styled mockup** | **Adds network/style**: real styling, real client state, MSW-mocked network; client-only behaviors[\*](#narration-as-first-class-scaffolding) get implemented | Styling system, state library, MSW. | Edge cases the styled UI now affords: empty states, error paths, autosuggest, toasts, etc |
+| **3. Styled mockup** | **Adds network/style**: real styling, real client state, MSW-mocked network; client-only behaviors[\*](#narration-as-first-class-scaffolding) get implemented | Tailwind + shadcn/ui, React hooks, MSW. | Edge cases the styled UI now affords: empty states, error paths, autosuggest, toasts, etc |
 | **4. Full prototype with mocked backend** | **Adds routing**: framework enters; app runs against MSW handlers in dev — demoable to users without a backend | A routing framework of your choice. | Tests for the framework-dependent behaviors implemented this stage. |
 | **5. Real backend, one route at a time** | **Adds backend**: implement a route, delete its MSW handler, re-run the suite — frontend untouched | A backend stack of your choice. | None new — the existing e2e tests now hit real endpoints. |
 | **6. Sink toward integration and unit** | **Adds granularity**: targeted unit tests for recurring regressions the e2e is too coarse to point at | A unit-testing framework of your choice. | Targeted unit tests, one per recurring regression. |
 
 **The same Playwright e2e tests run at every stage**, because they're anchored to accessible roles and labels (which survive every rewrite) and to MSW network handlers (which survive every backend swap).
 
-**Only two opinionated tool choices** are baked into this pipeline: Playwright (from Stage 2) and MSW (from Stage 3). Everything else — styling system, state library, framework, backend stack, database, auth provider — is your call, introduced at the stage that makes sense. Each stage below has a click-to-copy prompt with explicit constraints so your AI agent can't drift outside that stage's scope.
+**Locked in: Playwright (Stage 2+) and MSW (Stage 3+).** Sane defaults you can swap at each stage's prompt: **React + React hooks** for the runtime and state, **Tailwind + shadcn/ui** for styling and components. Routing framework and backend stack are picked at Stages 4 and 5. The point is to start as close to the finish line as possible while keeping every default swappable.
 
 ## Contents
 
@@ -62,14 +62,23 @@ The fix isn't to find things that never change. It's to anchor tests to the thin
 
 That's the whole game: tests fail when the product changes and stay quiet when it doesn't. Coupling them to roles, URLs, and boundary I/O is what buys you that property.
 
-## Two opinionated tools, everything else your choice
+## Locked-in tools and sane defaults
 
-This pipeline is technology-agnostic by design. The frontend world has too many good options for me to evangelize one, and I want this approach to work whether you reach for React, Svelte, Vue, htmx, or plain HTML modules. So only two tool choices are baked in, and they're the two that make the rest portable:
+The whole point is to start as close to the finish line as possible — *without* trapping you in a stack. So the pipeline distinguishes two kinds of tech: a small number of tools that are non-negotiable because they're load-bearing for the pipeline's invariants, and a layer of sane defaults that get you a working app fast but can be swapped at the relevant stage's prompt.
 
-- **Playwright** (Stage 2+) — because the role/label locator API is what lets the same test survive from a static `.html` file all the way to a production framework. Other e2e tools have similar APIs; the principle works with any of them.
+**Locked in:**
+
+- **Playwright** (Stage 2+) — because the role/label locator API is what lets the same test survive from a static `.html` file all the way to a production framework. Other e2e tools have similar APIs; the principle works with any of them, but the post uses Playwright by name.
 - **MSW** (Stage 3+) — because intercepting at the network layer (not at a function call) is what lets the same handlers serve as the mock backend in tests, in dev, and as the migration checklist when the real backend lands.
 
-Everything else — styling system, state library, routing framework, backend stack, database, ORM, auth provider, deployment target — is your call. Each stage below explicitly lists what tech enters at that stage and what's still off-limits, so you can't accidentally pull a future-stage dependency into an earlier one.
+**Sane defaults (swap by editing the prompt for that stage):**
+
+- **React** (Stage 2+) — the runtime the rest of the defaults are built around. If you swap React out, you'll also need to swap the component library and state approach to match — `shadcn/ui` and `React hooks` are React-specific.
+- **Tailwind + shadcn/ui** (Stage 3+) — styling and components. Tailwind alone is framework-agnostic; shadcn/ui is React-specific (community ports exist for Svelte/Solid/Vue). Swap to Open Props, Pico.css, or any other styling approach if you prefer something else.
+- **React hooks** — `useState`, `useReducer`, `useContext` (Stage 3+) — built-in client state, zero new dependencies. Swap to Zustand, Nano Stores, signals, or whatever your shape needs.
+- **Routing framework** (Stage 4) and **backend stack** (Stage 5) — chosen at those stages; the post leaves these open.
+
+Each stage's prompt enforces what's allowed and what's off-limits, so the agent can't accidentally pull a future-stage dependency into an earlier one — and when you swap a default, you do it in one place.
 
 ## Narration as first-class scaffolding
 
@@ -256,7 +265,7 @@ Output:
 
 Real styling, real client-side state, real component patterns. The inline `<script>` becomes proper code. The network is mocked with [MSW](https://mswjs.io). Default handlers live in `tests/handlers.ts` — that file is now my materialized backend backlog. The Stage 2 tests still pass, because the roles and labels didn't change.
 
-- **Tech introduced:** a styling approach of your choice (Tailwind, CSS modules, vanilla CSS, whatever), a state-management approach of your choice (vanilla store, Zustand, signals, whatever), MSW.
+- **Tech introduced:** Tailwind + shadcn/ui for styling and components (default — swap by editing the prompt), React hooks (`useState`, `useReducer`, `useContext`) for client state (default), MSW for network mocking (locked in).
 - **Off-limits:** routing framework, real backend, database, auth provider, server-side rendering.
 - **Narrations:** in this stage's Build, replace any narration whose behavior is implementable in client-only code (animations, dropdowns, modals, toasts, autosuggest UI). The matching tests land in Add tests. Leave narrations that require routing or a backend.
 
@@ -265,12 +274,13 @@ Real styling, real client-side state, real component patterns. The inline `<scri
 Upgrade the click-through prototype to a styled mockup with client state and an MSW-mocked network. Replace the in-reach narrations with real implementations — the tests come in the next sub-stage.
 
 ```
-You are upgrading a click-through HTML prototype into a styled mockup.
+You are upgrading a click-through HTML prototype into a styled mockup. The default stack for this stage is React + Tailwind + shadcn/ui + React hooks + MSW; swap any of the defaults by editing this prompt before pasting it.
 
-You may introduce, of my choice:
-- A CSS / component-library approach: [FILL IN, e.g. "Tailwind + shadcn/ui", "Open Props + vanilla CSS modules", "Pico.css"].
-- A client-state approach: [FILL IN, e.g. "vanilla JS with a small store class", "Zustand", "Nano Stores", "Solid signals"].
-- MSW for mocking all network calls. Default handlers go in tests/handlers.ts and are loaded by both the dev server and the Playwright test setup.
+You will introduce:
+- **React** as the runtime. (Swap: replace with Svelte, Vue, Solid, or another framework — if you do, also swap the component library and state approach below to match.)
+- **Tailwind CSS + shadcn/ui** for styling and components. (Swap: replace with another approach, e.g. Open Props + vanilla CSS modules, Pico.css, your own component library. If you swap, ensure the replacement preserves ARIA roles so the existing Playwright tests keep finding their locators.)
+- **React hooks** (`useState`, `useReducer`, `useContext`) for client state — built-in, no new dependency. (Swap: Zustand, Nano Stores, signals, or whatever fits.)
+- **MSW** for mocking all network calls (locked in — do not swap). Default handlers go in `tests/handlers.ts` and are loaded by both the dev server and the Playwright test setup.
 
 Still OFF-LIMITS — strict:
 - No routing framework (Next.js, React Router, SvelteKit, Astro, Remix, etc.).
