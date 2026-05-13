@@ -237,28 +237,37 @@ const nextPost =
     const codeBlocks = Array.from(document.querySelectorAll("pre"));
 
     for (const codeBlock of codeBlocks) {
-      const wrapper = document.createElement("div");
-      wrapper.style.position = "relative";
-
-      // Check if --file-name-offset custom property exists
-      const computedStyle = getComputedStyle(codeBlock);
-      const hasFileNameOffset =
-        computedStyle.getPropertyValue("--file-name-offset").trim() !== "";
-
-      // Determine the top positioning class
-      const topClass = hasFileNameOffset
-        ? "top-(--file-name-offset)"
-        : "-top-3";
+      const detailsAncestor = codeBlock.closest("details");
+      codeBlock.setAttribute("tabindex", "0");
 
       const copyButton = document.createElement("button");
-      copyButton.className = `copy-code absolute end-3 ${topClass} rounded bg-muted border border-muted px-2 py-1 text-xs leading-4 text-foreground font-medium`;
+      copyButton.className = `copy-code rounded bg-muted border border-muted px-2 py-1 text-xs leading-4 text-foreground font-medium`;
       copyButton.innerHTML = copyButtonLabel;
-      codeBlock.setAttribute("tabindex", "0");
-      codeBlock.appendChild(copyButton);
 
-      // wrap codebock with relative parent element
-      codeBlock?.parentNode?.insertBefore(wrapper, codeBlock);
-      wrapper.appendChild(codeBlock);
+      if (detailsAncestor) {
+        /* For prompts wrapped in <details>: pin the button to the top-right
+         * of the <details> itself so it's visible whether the prompt is
+         * expanded or collapsed. */
+        copyButton.classList.add("absolute", "end-3", "top-1");
+        detailsAncestor.style.position = "relative";
+        detailsAncestor.appendChild(copyButton);
+      } else {
+        /* Default: copy button inside the <pre>, positioned by the
+         * existing logic (file-name offset if present, otherwise above). */
+        const computedStyle = getComputedStyle(codeBlock);
+        const hasFileNameOffset =
+          computedStyle.getPropertyValue("--file-name-offset").trim() !== "";
+        const topClass = hasFileNameOffset
+          ? "top-(--file-name-offset)"
+          : "-top-3";
+        copyButton.classList.add("absolute", "end-3", topClass);
+        codeBlock.appendChild(copyButton);
+
+        const wrapper = document.createElement("div");
+        wrapper.style.position = "relative";
+        codeBlock?.parentNode?.insertBefore(wrapper, codeBlock);
+        wrapper.appendChild(codeBlock);
+      }
 
       copyButton.addEventListener("click", async () => {
         await copyCode(codeBlock, copyButton);
