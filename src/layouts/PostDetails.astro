@@ -245,12 +245,17 @@ const nextPost =
       copyButton.innerHTML = copyButtonLabel;
 
       if (detailsAncestor) {
-        /* For prompts wrapped in <details>: pin the button to the top-right
-         * of the <details> itself so it's visible whether the prompt is
-         * expanded or collapsed. */
-        copyButton.classList.add("absolute", "end-3", "top-1");
-        detailsAncestor.style.position = "relative";
-        detailsAncestor.appendChild(copyButton);
+        /* For prompts wrapped in <details>: put the button INSIDE the
+         * <summary> so it's visible whether the prompt is expanded or
+         * collapsed (browsers hide all non-summary children of a closed
+         * <details>). Anchor it to the top-right of the summary row.
+         * The click handler stops propagation so clicking the button
+         * doesn't also toggle the disclosure. */
+        const summary = detailsAncestor.querySelector("summary");
+        copyButton.classList.add("absolute", "end-0", "top-0");
+        summary.style.position = "relative";
+        summary.style.paddingRight = "4rem";
+        summary.appendChild(copyButton);
       } else {
         /* Default: copy button inside the <pre>, positioned by the
          * existing logic (file-name offset if present, otherwise above). */
@@ -269,7 +274,11 @@ const nextPost =
         wrapper.appendChild(codeBlock);
       }
 
-      copyButton.addEventListener("click", async () => {
+      copyButton.addEventListener("click", async event => {
+        /* When the button lives inside a <summary>, stop the click from
+         * also toggling the disclosure. */
+        event.stopPropagation();
+        event.preventDefault();
         await copyCode(codeBlock, copyButton);
       });
     }
