@@ -67,18 +67,12 @@ A one-time install before Stage 1. The seven stages all assume you have a projec
 ```
 You are setting up the project scaffold I'll use across all seven stages of the build pipeline. Defaults: React + Vite + Tailwind + shadcn-style components, Playwright + MSW for tests, an HTML parser for Stage 1's structural lint.
 
-Step 0 — ask me first, then wait for my answers before proceeding:
-- Project name (used as the package.json "name" and the directory name)
-- One-line description (used as the package.json "description")
-- Author name + optional email (for package.json "author")
-- License (default MIT)
-- Node version preference, if any (default: my current LTS)
-- Anything else you'd normally collect from `npm init` that you want explicit about
+Step 0 — ask me for the project name, then wait for my answer. That's the only thing you need from me; default everything else to sensible values.
 
 Steps — once I've answered, do them in order:
 
 1. Initialize:
-   - Write package.json from my answers above (do NOT use `npm init -y` defaults).
+   - Write package.json using the project name I gave you; default the rest (description empty, author empty, license MIT, ESM module type).
    - `git init` and write a sensible .gitignore for Node + Vite + Playwright (include at least: node_modules, dist, test-results, playwright-report, .env, .DS_Store).
 
 2. Install dependencies at LATEST STABLE versions. Your training data is likely months or years stale, so don't trust remembered version numbers. For each package below, run `npm view <pkg> version` to discover the current latest, then install with the explicit `@latest` tag (e.g. `npm install -D @playwright/test@latest`) so npm resolves freshly rather than falling back to anything cached.
@@ -214,6 +208,8 @@ Assertions — must all pass:
 
 Tracked metrics — report but do not fail on:
 - Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
+
+Delegate the script writing to a subagent so the parent chat doesn't carry the parser-specific implementation in context. Pass it: the five assertions above, the bucket-class + bold-prefix rule from Stage 1's Narrations spec, and your choice of HTML parser. The parent only verifies the script exits 0 against the current wireframe.
 
 Output:
 - tests/wireframe-lint.mjs (the script). The `lint:wireframe` package.json script already exists from Setup.
@@ -381,6 +377,8 @@ Constraints — strict:
 
 Before this sub-stage is done, run the existing structural lint (`npm run lint:wireframe`). It must still pass. If it doesn't, fix the wireframe — do not weaken the lint.
 
+Spawn one subagent per flow to write that flow's test file. Pass each subagent only: (1) the screens involved in its flow and the accessible names on them (button labels, form labels, headings), (2) the role/label-locator rule (no CSS selectors, no test IDs, no XPath). The parent doesn't need the test bodies in its context. Wait for all subagents to finish, then run `npx playwright test` to verify each test exists and passes.
+
 Output:
 - A playwright.config.ts with a webServer entry that serves the static files locally.
 - One test file per flow under tests/e2e/.
@@ -503,6 +501,8 @@ For every narration tagged with the `state` class (i.e. every `<aside class="nar
 
 Leave every other narration in place — they belong to later stages (`network`, `style`, `framework`, `backend`).
 
+Once the user and you have agreed on the component tree (App, Provider / Context, per-screen components), spawn one subagent per screen to refactor that screen's `.html` file into a React component plus any helpers it needs. Pass each subagent: (1) the screen's current HTML, (2) the agreed component name and shape, (3) the state slice it reads/writes, (4) the narrations on that screen with their bucket prefixes (so it knows which to replace and which to leave). The parent doesn't need every component's source in context. Wait for all subagents to finish, then assemble them in App and verify the app boots.
+
 Output:
 - The React app.
 - A list of the replaced state narrations with the verbatim text of each (this list drives the next sub-stage's tests).
@@ -526,6 +526,8 @@ Before this sub-stage is done, run the full test suite from all previous stages 
 1. First check: did this stage's new code change an accessible name, a heading, a label, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
 2. If the failure reflects a deliberate product change (a button renamed on purpose, a flow restructured), update the test in its own commit with a message that names the product change.
 3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+Spawn one subagent per replaced state-only narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the React component(s) that implement the behavior, (3) the role/label-locator rule. Trivially parallel — wait for all subagents to finish, then run the full suite.
 
 Output:
 - One new test file per replaced narration, under tests/e2e/.
@@ -626,6 +628,8 @@ For every narration tagged with the `network` class (i.e. every `<aside class="n
 
 Leave every other narration in place — they belong to later stages (`style`, `framework`, `backend`).
 
+Once you've enumerated the network calls the app needs (each network narration plus any fetch sites already in use), spawn one subagent per endpoint to write both its MSW handler (in `tests/handlers.ts`) and the matching `fetch` call at the relevant component. Pass each subagent: (1) the endpoint URL + method + request/response shape, (2) the component that calls it, (3) the narration it replaces (with its `<strong>Network —</strong>` prefix). Wait for all subagents to finish, then have the parent concatenate the handlers into `tests/handlers.ts`.
+
 Output:
 - The updated React app with `fetch` calls and an MSW setup.
 - `tests/handlers.ts` with mock handlers for every network call the app makes.
@@ -650,6 +654,8 @@ Before this sub-stage is done, run the full test suite from all previous stages 
 1. First check: did this stage's new code change an accessible name, a heading, a label, an MSW handler shape, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
 2. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the product change.
 3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+Spawn one subagent per replaced network narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the relevant `network.use(http.METHOD(...))` override pattern for the scenario this test needs (empty list, error response, populated suggestions, slow response), (3) the role/label-locator rule. The parent never sees the test bodies. Wait for all subagents to finish, then run the full suite.
 
 Output:
 - One new test file per replaced narration, under tests/e2e/.
@@ -743,6 +749,8 @@ For every narration tagged with the `style` class (i.e. every `<aside class="nar
 - REPLACE the narration with the real implementation using Tailwind + shadcn/ui (or your chosen styling stack).
 
 Leave every other narration in place — they belong to later stages (`framework`, `backend`).
+
+After running `npx shadcn@latest init` and picking a base theme, spawn one subagent per React component file to apply Tailwind classes and swap in shadcn primitives. Pass each subagent: (1) the component's current source, (2) the role-preservation constraint (every locator from Stages 2–4 must still resolve), (3) any `style`-class narrations inside that component (with their `<strong>Style —</strong>` prefixes). Components style mostly independently — wait for all subagents to finish, then run the full suite to confirm role/label locators survived.
 
 Critical constraint: **preserve accessible names**. Every `<button>` named "Submit" must remain findable as `getByRole('button', { name: 'Submit' })` after styling. If shadcn/ui's wrapper components change the underlying role (rare but possible), adjust the wrapping so accessibility roles are preserved. Do NOT add test IDs to compensate; fix the markup.
 
@@ -852,6 +860,8 @@ For every narration tagged with the `framework` class (i.e. every `<aside class=
 
 Leave every `backend` narration in place — Stage 7 handles those.
 
+Once you and the user have agreed on the routing framework and the overall route file structure, spawn one subagent per route to write its route file. Pass each subagent: (1) the route's URL pattern + the framework's loader/action signature, (2) the existing React component being moved into the route, (3) any `framework`-class narration tied to this route (with its `<strong>Framework —</strong>` prefix) so it can replace it inline. Wait for all subagents to finish, then have the parent wire them into the route config.
+
 Output:
 - The framework-migrated app.
 - Updated tests/handlers.ts if new mocked endpoints emerged from framework data-loading patterns.
@@ -876,6 +886,8 @@ Before this sub-stage is done, run the full test suite from all previous stages 
 1. First check: did this stage's new code change an accessible name, a heading, a label, an MSW handler shape, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
 2. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the change.
 3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+Spawn one subagent per replaced framework-dependent narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the route(s) involved, (3) the role/label-locator rule plus permission to assert on `.toHaveURL` where the user-facing URL is part of the narration's behavior. Wait for all subagents to finish, then run the full suite.
 
 Output:
 - One new test file per replaced narration, under tests/e2e/.
