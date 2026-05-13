@@ -244,14 +244,26 @@ const nextPost =
       copyButton.className = `copy-code rounded bg-muted border border-muted px-2 py-1 text-xs leading-4 text-foreground font-medium`;
       copyButton.innerHTML = copyButtonLabel;
 
-      if (detailsAncestor) {
+      /* Only anchor to <summary> when the <details> exists to hold a
+       * primary code block (the prompt collapsibles). For <details>
+       * that incidentally contain a <pre> as one of many children
+       * (e.g., Background blocks with illustrative examples), fall
+       * back to the default in-pre button. Recognize prompt
+       * collapsibles by their summary label. */
+      const summary = detailsAncestor?.querySelector("summary");
+      const summaryLabel = summary?.textContent.trim() || "";
+      const isPromptDetails =
+        summaryLabel.startsWith("Build prompt") ||
+        summaryLabel.startsWith("Add tests prompt") ||
+        summaryLabel === "Prompt";
+
+      if (detailsAncestor && isPromptDetails) {
         /* For prompts wrapped in <details>: put the button INSIDE the
          * <summary> so it's visible whether the prompt is expanded or
          * collapsed (browsers hide all non-summary children of a closed
          * <details>). Anchor it to the top-right of the summary row.
          * The click handler stops propagation so clicking the button
          * doesn't also toggle the disclosure. */
-        const summary = detailsAncestor.querySelector("summary");
         copyButton.classList.add("absolute", "end-0", "top-0");
         summary.style.position = "relative";
         summary.style.paddingRight = "4rem";
