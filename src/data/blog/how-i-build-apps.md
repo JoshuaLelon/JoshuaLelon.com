@@ -473,12 +473,30 @@ That's the whole game: tests fail when the product changes and stay quiet when i
 <details>
 <summary>Example</summary>
 
-Stage 1's Add tests prompt produced the structural lint, which flagged one input on the share modal that was missing a `<label for>`. I asked the agent to fix it; it patched the wireframe and the lint went green.
+Stage 1's Add tests prompt had produced the structural lint, which flagged one input on the share modal missing a `<label for>`. I asked the agent to fix it; it patched the wireframe and the lint went green.
 
-Then Stage 2's Build prompt. The agent asked whether to carry form values via URL params or `sessionStorage`. I picked URL params — simpler, less hidden state, and Playwright can verify the URL too. It added inline `<script>` to `new-note.html` and `note.html`:
+Then Stage 2's Build prompt. The agent asked whether to carry form values via URL params or `sessionStorage`. I picked URL params — Playwright can assert on the URL directly, and the encoded values stay visible to anyone reading along.
+
+Its first pass cherry-picked fields by name:
 
 ```html
-<!-- new-note.html, appended -->
+<!-- new-note.html, appended (first pass) -->
+<script>
+  document.querySelector('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const title = e.target.title.value;
+    const content = e.target.content.value;
+    location.href = `note.html?title=${title}&content=${content}`;
+  });
+</script>
+```
+
+I walked through: typed "Groceries" / "Milk, eggs" / "home, errands", hit Save. The next screen showed the title and content. But the **Tags** line was empty. The agent had named two of the three fields and silently dropped the third — and the URL on the next screen confirmed it: `note.html?title=Groceries&content=Milk%2C%20eggs`, no `tags=`.
+
+Two fixes in one ask: encode the whole form with `FormData` so future fields can't fall off the floor the same way, and read every field by a `data-render` hook on the receiving side instead of hardcoded selectors:
+
+```html
+<!-- new-note.html, appended (fixed) -->
 <script>
   document.querySelector('form').addEventListener('submit', e => {
     e.preventDefault();
@@ -492,10 +510,16 @@ Then Stage 2's Build prompt. The agent asked whether to carry form values via UR
 <!-- note.html, appended -->
 <script>
   const params = new URLSearchParams(location.search);
-  document.querySelector('h1').textContent = params.get('title') || 'Untitled';
-  document.querySelector('.content').textContent = params.get('content') || '';
+  document.querySelectorAll('[data-render]').forEach(el => {
+    const v = params.get(el.dataset.render);
+    if (v) el.textContent = v;
+  });
 </script>
 ```
+
+Now all three fields land. Try it — type into the new-note form, hit Save, watch the note view render with what you typed (and the faux URL bar at the bottom of the iframe shows the encoded params):
+
+<figure style="margin:1.25rem 0;display:flex;flex-direction:column;border:1px solid var(--border);"><figcaption style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.8rem;padding:0.35rem 0.6rem;background:rgba(127,127,127,0.12);border-bottom:1px solid var(--border);">notes-wireframe/ — stage 2 — type into "new note" and hit Save</figcaption><iframe loading="lazy" src="/wireframes/notes-stage-2.html" style="width:100%;height:680px;border:0;background:white;"></iframe></figure>
 
 Stage 2's Add tests prompt landed one Playwright test per flow. The "create note" one:
 
@@ -504,12 +528,22 @@ test('create note flow', async ({ page }) => {
   await page.goto('/new-note.html');
   await page.getByLabel('Title').fill('My first note');
   await page.getByLabel('Content').fill('Hello world');
-  await page.getByRole('button', { name: 'Submit' }).click();
+  await page.getByLabel('Tags').fill('home, errands');
+  await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'My first note' })).toBeVisible();
+  await expect(page.getByText('home, errands')).toBeVisible();
 });
 ```
 
-The four Stage 1 narrations stay in place — they all describe behavior beyond what plain JS can deliver here.
+`npx playwright test`:
+
+```
+✓ create-note.test.ts › create and view a note (215ms)
+✓ delete-note.test.ts › delete returns to list (180ms)
+✓ share-note.test.ts › share modal renders (160ms)
+```
+
+Three tests now act as the contract for those three flows. The four Stage 1 narrations stay in place — they all describe behavior beyond what plain JS can deliver here.
 
 </details>
 

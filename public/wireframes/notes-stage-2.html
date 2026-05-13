@@ -1,0 +1,182 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Notes — wireframe (stage 2)</title>
+<style>
+  body { font-family: system-ui; margin: 0; color: #111; background: #fff; }
+  main { padding: 1rem; }
+  nav.dev { display: flex; gap: .75rem; padding: .5rem .75rem; background: #f3f4f6; border-bottom: 1px solid #d1d5db; font-size: .85rem; flex-wrap: wrap; }
+  section.screen { display: none; }
+  section.screen.active { display: block; }
+  form > * { display: block; margin: .35rem 0; }
+  textarea { width: 100%; min-height: 4rem; font: inherit; }
+  input, select, button { font: inherit; }
+  .btn { display: inline-block; padding: .3em .7em; border: 1px solid #888; background: #eee; text-decoration: none; color: inherit; cursor: pointer; }
+  dialog { display: block; position: static; inset: auto; border: 1px solid #999; padding: .6rem .75rem; margin: .75rem 0; background: #fafafa; }
+  .faux-url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; color: #555; background: #fafafa; border-top: 1px solid #d1d5db; padding: .35rem .6rem; word-break: break-all; }
+  aside.narration { border-left: 4px solid var(--c); background: var(--bg); padding: .5em .75em; margin: 1em 0; font-style: italic; }
+  aside.narration > strong:first-child { display: none; }
+  aside.narration.state     { --c: #3b82f6; --bg: #eff6ff; }
+  aside.narration.network   { --c: #10b981; --bg: #ecfdf5; }
+  aside.narration.style     { --c: #8b5cf6; --bg: #f5f3ff; }
+  aside.narration.framework { --c: #f59e0b; --bg: #fffbeb; }
+  aside.narration.backend   { --c: #ef4444; --bg: #fef2f2; }
+</style>
+</head>
+<body>
+<nav class="dev" aria-label="screens">
+  <a href="#home">home</a>
+  <a href="#signup">signup</a>
+  <a href="#login">login</a>
+  <a href="#notes">notes</a>
+  <a href="#new-note">new note</a>
+  <a href="#note">note</a>
+</nav>
+<main>
+  <section id="home" class="screen">
+    <h1>Notes</h1>
+    <p>A small place to keep your thoughts.</p>
+    <p><a class="btn" href="#signup">Sign up</a> &nbsp; <a class="btn" href="#login">Log in</a></p>
+  </section>
+
+  <section id="signup" class="screen">
+    <h1>Sign up</h1>
+    <form data-action="#notes">
+      <label for="su-email">Email</label>
+      <input id="su-email" name="email" type="email" required>
+      <label for="su-pw">Password</label>
+      <input id="su-pw" name="password" type="password" required>
+      <button type="submit">Create account</button>
+    </form>
+    <p>Already have an account? <a href="#login">Log in</a>.</p>
+  </section>
+
+  <section id="login" class="screen">
+    <h1>Log in</h1>
+    <form data-action="#notes">
+      <label for="li-email">Email</label>
+      <input id="li-email" name="email" type="email" required>
+      <label for="li-pw">Password</label>
+      <input id="li-pw" name="password" type="password" required>
+      <button type="submit">Log in</button>
+    </form>
+  </section>
+
+  <section id="notes" class="screen">
+    <header>
+      <h1>Your notes</h1>
+      <p><a class="btn" href="#new-note">New note</a></p>
+    </header>
+    <label for="sort">Sort by</label>
+    <select id="sort">
+      <option>Newest</option>
+      <option>Oldest</option>
+      <option>Title</option>
+    </select>
+    <aside class="narration state">
+      <strong>State-only —</strong>
+      Changing the sort dropdown re-renders the list below in the chosen order.
+    </aside>
+    <ul>
+      <li><a href="#note">Grocery list</a> — home, errands</li>
+      <li><a href="#note">Book ideas</a> — writing</li>
+      <li><a href="#note">Standup notes</a> — work</li>
+    </ul>
+  </section>
+
+  <section id="new-note" class="screen">
+    <header>
+      <h1>New note</h1>
+      <p><a href="#notes">Back to notes</a></p>
+    </header>
+    <form id="new-note-form" data-action="#note">
+      <label for="nn-title">Title</label>
+      <input id="nn-title" name="title" type="text" required>
+      <label for="nn-content">Content</label>
+      <textarea id="nn-content" name="content" required></textarea>
+      <label for="nn-tags">Tags</label>
+      <input id="nn-tags" name="tags" type="text">
+      <aside class="narration network">
+        <strong>Network —</strong>
+        As the user types, autosuggest from prior tags appears as a listbox below the input.
+      </aside>
+      <button type="submit">Save</button>
+      <aside class="narration style">
+        <strong>Style —</strong>
+        On Submit, the card slides up off-screen and a green "Note saved" toast fades in from the bottom for ~3s.
+      </aside>
+    </form>
+  </section>
+
+  <section id="note" class="screen">
+    <header>
+      <h1 data-render="title">Grocery list</h1>
+      <p><a href="#notes">Back to notes</a></p>
+    </header>
+    <article>
+      <p data-render="content">Milk, bread, eggs, apples.</p>
+      <p>Tags: <span data-render="tags">home, errands</span></p>
+    </article>
+    <p><a class="btn" href="#notes">Delete</a> <a class="btn" href="#note">Share</a></p>
+    <dialog open>
+      <p>Delete this note?</p>
+      <p><button type="button">Confirm</button> <button type="button">Cancel</button></p>
+      <aside class="narration state">
+        <strong>State-only —</strong>
+        Opens when Delete is clicked; closes on Cancel or after Confirm.
+      </aside>
+    </dialog>
+    <dialog open>
+      <p>Share with a teammate</p>
+      <label for="share-email">Email</label>
+      <input id="share-email" type="email">
+      <p><button type="button">Send invite</button></p>
+    </dialog>
+  </section>
+</main>
+<div class="faux-url" aria-label="iframe url">about:wireframe</div>
+<script>
+  /* Same routing trick as Stage 1: capture-phase click + class-toggle, so the
+     parent post's ClientRouter can't hijack same-origin navigation. The actual
+     Stage 2 artifact a reader produces uses real <a href> + real form GET
+     submissions to real .html files — Stage 2's whole point is that values
+     land in the URL where Playwright can assert on them. This single-page demo
+     fakes the URL via a "faux-url" line at the bottom so you can see the
+     params land. */
+  const fauxUrl = document.querySelector('.faux-url');
+  function show(id, params) {
+    document.querySelectorAll('section.screen').forEach(s => s.classList.toggle('active', s.id === id));
+    if (id === 'note' && params) {
+      document.querySelectorAll('#note [data-render]').forEach(el => {
+        const key = el.getAttribute('data-render');
+        const v = params.get(key);
+        if (v && v.trim()) el.textContent = v;
+      });
+      fauxUrl.textContent = `note.html?${params.toString()}`;
+    } else {
+      fauxUrl.textContent = `${id === 'home' ? 'index' : id}.html`;
+    }
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (!href || !href.startsWith('#')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    show(href.slice(1));
+  }, true);
+  document.querySelectorAll('form[data-action]').forEach(f => {
+    f.addEventListener('submit', e => {
+      e.preventDefault();
+      const target = f.getAttribute('data-action').slice(1);
+      // This is the fix from the narrative — encode the whole form, not a cherry-pick.
+      const params = new URLSearchParams(new FormData(f));
+      show(target, params);
+    });
+  });
+  show('home');
+</script>
+</body>
+</html>
