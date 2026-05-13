@@ -82,6 +82,14 @@
       @apply inline-block cursor-pointer text-foreground select-none [&_p]:hidden [&_ul]:!my-0;
     }
 
+    /* details that wrap a code block (e.g. click-to-copy prompts) need
+       block display so the inner <pre> doesn't blow the wrapper wider
+       than the article — otherwise the absolute-positioned copy button
+       sits off-screen at the right edge. */
+    details:has(pre) {
+      @apply block;
+    }
+
     summary {
       @apply focus-visible:no-underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus-visible:outline-dashed;
     }
