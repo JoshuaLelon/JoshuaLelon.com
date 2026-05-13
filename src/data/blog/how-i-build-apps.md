@@ -108,7 +108,8 @@ Notable omissions and where they go instead: `<img>`, `<canvas>`, `<video>`, `<a
 
 #### Build
 
-Generate the wireframe artifact: one `.html` file per screen, linked with `<a href>`s, using only the Wireframe HTML subset above.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are helping me wireframe a web app: [DESCRIBE THE APP IN 1-2 SENTENCES].
@@ -141,9 +142,14 @@ Output:
 - No other files.
 ```
 
+</details>
+
+Generate the wireframe artifact: one `.html` file per screen, linked with `<a href>`s, using only the Wireframe HTML subset above.
+
 #### Add tests
 
-Write a structural lint that asserts the wireframe is well-formed. Pure static analysis — no browser, no Playwright, no server. These checks survive every later stage unchanged because they assert *positive* invariants (every input has a label, every SVG has a title) rather than per-stage prohibitions.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing a structural lint for a folder of static HTML wireframes.
@@ -168,6 +174,10 @@ Output:
 - A package.json with one script entry: "lint:wireframe": "node tests/wireframe-lint.mjs".
 - Example run output showing the assertions passing and the narration count.
 ```
+
+</details>
+
+Write a structural lint that asserts the wireframe is well-formed. Pure static analysis — no browser, no Playwright, no server. These checks survive every later stage unchanged because they assert *positive* invariants (every input has a label, every SVG has a title) rather than per-stage prohibitions.
 
 ### Stage 2: Custom-input prototype
 
@@ -203,7 +213,8 @@ That's the whole game: tests fail when the product changes and stay quiet when i
 
 #### Build
 
-Add the minimum vanilla JS so the static wireframe behaves like a click-through prototype: form submits transition to the next screen with typed values carried forward.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are extending an HTML wireframe with the minimum behavior to make form-submit flows navigable.
@@ -223,9 +234,14 @@ Output:
 - A short description of what each flow now does end-to-end.
 ```
 
+</details>
+
+Add the minimum vanilla JS so the static wireframe behaves like a click-through prototype: form submits transition to the next screen with typed values carried forward.
+
 #### Add tests
 
-Write the first Playwright e2e per flow. Locators are role/label only — no CSS selectors, no test IDs, no XPath. Each test walks the flow from entry to completion and asserts the user-facing outcome.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing the first Playwright e2e tests against a click-through HTML prototype.
@@ -248,6 +264,10 @@ Output:
 - All tests pass when I run `npx playwright test`. Existing structural lint still passes.
 ```
 
+</details>
+
+Write the first Playwright e2e per flow. Locators are role/label only — no CSS selectors, no test IDs, no XPath. Each test walks the flow from entry to completion and asserts the user-facing outcome.
+
 ### Stage 3: Stateful prototype
 
 This is where React enters and the state model jumps a level. Stage 2 was single-hop (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. The inline `<script>` blocks become real components; React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, and any cross-screen invariant the tests want to assert. There's no network yet, and no styling yet either. The artifact at the end of this stage is ugly but stateful.
@@ -260,7 +280,8 @@ React is the default runtime from this stage onward — the rest of the stack de
 
 #### Build
 
-Refactor the click-through prototype into React components with hooks for state. Replace state-only narrations — tests come in the next sub-stage.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are refactoring a click-through HTML prototype into a React app with global-ish state. No styling, no network, no routing framework, no backend.
@@ -286,9 +307,14 @@ Output:
 - A list of remaining <aside class="narration"> blocks, partitioned by category (network-dependent, style-only, framework-dependent, backend-dependent).
 ```
 
+</details>
+
+Refactor the click-through prototype into React components with hooks for state. Replace state-only narrations — tests come in the next sub-stage.
+
 #### Add tests
 
-Write one Playwright e2e per state-only narration replaced in Build. Run the full previous suite; previous tests should pass unchanged.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing Playwright e2e tests for state-only behaviors that were just implemented from narrations in a React app.
@@ -308,6 +334,10 @@ Output:
 - Test run output showing: structural lint passing, Stage 2 e2e passing, all new tests passing.
 ```
 
+</details>
+
+Write one Playwright e2e per state-only narration replaced in Build. Run the full previous suite; previous tests should pass unchanged.
+
 ### Stage 4: Mocked network
 
 MSW arrives as the network seam. The React app from Stage 3 can now make `fetch` calls; MSW intercepts them and returns mocked responses. Default handlers live in `tests/handlers.ts` — that file is now my materialized backend backlog. Anything that previously couldn't be expressed because it required a network round-trip (autosuggest, server errors, optimistic UI, save-then-reload) becomes implementable. The artifact at the end of this stage is functionally complete but visually still bare.
@@ -320,7 +350,8 @@ MSW is the second of the two locked-in tools. Intercepting at the network layer 
 
 #### Build
 
-Wire up MSW as the network seam, add `fetch` calls in the app for things that need persistence/server interaction, and replace network-dependent narrations.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are adding a mocked-network layer (MSW) to a working React app with global state. No styling, no routing framework, no real backend.
@@ -345,9 +376,14 @@ Output:
 - A list of remaining <aside class="narration"> blocks, partitioned by category (style-only, framework-dependent, backend-dependent).
 ```
 
+</details>
+
+Wire up MSW as the network seam, add `fetch` calls in the app for things that need persistence/server interaction, and replace network-dependent narrations.
+
 #### Add tests
 
-Write one Playwright e2e per network-dependent narration replaced in Build. Use `network.use(...)` for per-test scenario setup. Run the full previous suite.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing Playwright e2e tests for network-dependent behaviors that were just implemented from narrations.
@@ -367,6 +403,10 @@ Output:
 - Test run output showing: structural lint passing, Stage 2 + Stage 3 e2e passing, all new tests passing.
 ```
 
+</details>
+
+Write one Playwright e2e per network-dependent narration replaced in Build. Use `network.use(...)` for per-test scenario setup. Run the full previous suite.
+
 ### Stage 5: Styled mockup
 
 The polish pass. The app already works — state, behaviors, and network seam are all in place from Stages 3 and 4. This stage makes it look like an app. Tailwind + shadcn/ui replace bare HTML elements with styled components. Any narration that specified visual fidelity (a specific card layout, an animation, a hover state) becomes a real implementation. The biggest risk at this stage is accidentally breaking accessible names — a careless wrap around a button or a class swap that drops the `<button>` role for a `<div onclick>` will break every prior Playwright test. The Add tests sub-stage here is mostly a regression check.
@@ -379,7 +419,8 @@ Tailwind + shadcn/ui are the styling defaults — Tailwind is framework-agnostic
 
 #### Build
 
-Introduce Tailwind + shadcn/ui (or your styling stack of choice) and apply it across the app. Replace style-only narrations. Preserve accessible names so the prior tests keep passing.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are styling a working React app with mocked-network behaviors. The app's behavior is already complete; this stage is the visual layer.
@@ -404,9 +445,14 @@ Output:
 - A list of remaining <aside class="narration"> blocks (these should all be framework- or backend-dependent at this point).
 ```
 
+</details>
+
+Introduce Tailwind + shadcn/ui (or your styling stack of choice) and apply it across the app. Replace style-only narrations. Preserve accessible names so the prior tests keep passing.
+
 #### Add tests
 
-Mostly regression: run the full previous suite and confirm every role/label locator still resolves. Add new tests only for style-only narrations whose behavior is independently testable.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are running the regression check after a styling pass, and writing targeted tests for any style-only narrations whose behavior is testable.
@@ -424,6 +470,10 @@ Output:
 - (Possibly empty) test files for testable style-only narrations.
 - Test run output showing: structural lint passing, Stages 2–4 e2e passing, any new tests passing.
 ```
+
+</details>
+
+Mostly regression: run the full previous suite and confirm every role/label locator still resolves. Add new tests only for style-only narrations whose behavior is independently testable.
 
 ### Stage 6: Full prototype with mocked backend
 
@@ -444,7 +494,8 @@ The only hard constraint: the framework migration must preserve accessible names
 
 #### Build
 
-Migrate the styled mockup onto a routing framework of your choice. Replace framework-dependent narrations with real implementations — tests come in the next sub-stage. The MSW handler layer remains intact.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are migrating a styled, client-only mockup to a real routing framework.
@@ -472,9 +523,14 @@ Output:
 - A list of remaining <aside class="narration"> blocks (these should all be backend-dependent at this point).
 ```
 
+</details>
+
+Migrate the styled mockup onto a routing framework of your choice. Replace framework-dependent narrations with real implementations — tests come in the next sub-stage. The MSW handler layer remains intact.
+
 #### Add tests
 
-Write one Playwright e2e per framework-dependent narration replaced in Build. Run the full previous suite; everything from Stages 1–5 should pass unchanged.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing Playwright e2e tests for framework-mediated behaviors that were just implemented from narrations.
@@ -493,6 +549,10 @@ Output:
 - One new test file per replaced narration, under tests/e2e/.
 - Test run output showing: structural lint passing, Stages 2–5 e2e passing, all new tests passing.
 ```
+
+</details>
+
+Write one Playwright e2e per framework-dependent narration replaced in Build. Run the full previous suite; everything from Stages 1–5 should pass unchanged.
 
 ### Stage 7: Backend slices
 
@@ -513,7 +573,8 @@ The contract you have to keep is whatever was in the MSW handler. Pick the backe
 
 #### Build
 
-Implement one real route, delete its handler, and (if any narration is tied to it) implement the corresponding UI. Tests come in the next sub-stage.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are replacing ONE MSW handler with a real backend route. This is a one-at-a-time operation.
@@ -539,9 +600,14 @@ Output:
 - A list (possibly empty) of <aside class="narration"> blocks that were replaced this iteration, with verbatim text.
 ```
 
+</details>
+
+Implement one real route, delete its handler, and (if any narration is tied to it) implement the corresponding UI. Tests come in the next sub-stage.
+
 #### Add tests
 
-Write Playwright e2e for any narration that landed with this iteration (often zero). Run the full previous suite — the deleted handler means existing tests are now hitting the real endpoint, and they must still pass.
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing Playwright e2e tests for any narration that landed alongside the backend route that just replaced an MSW handler.
@@ -561,6 +627,10 @@ Output:
 - Test run output showing: structural lint passing, all Stages 2–6 tests passing against the new mix of real backend + remaining MSW.
 ```
 
+</details>
+
+Write Playwright e2e for any narration that landed with this iteration (often zero). Run the full previous suite — the deleted handler means existing tests are now hitting the real endpoint, and they must still pass.
+
 ### Stage 8: Sink toward integration and unit
 
 Only now do I write the cheaper, more granular tests — and only for the bits of the e2e that are too expensive to iterate on. The signal is usually "we keep regressing the same subtle edge case and the e2e is too coarse to point at it." Date parsing, permission branches, reducer transitions, currency rounding. The e2e tests remain the load-bearing contract. Unit tests are scaffolding around the parts of it that need finer-grained pressure.
@@ -572,6 +642,9 @@ Only now do I write the cheaper, more granular tests — and only for the bits o
 This stage has no Build sub-stage — it's responding to an existing regression in code that already exists, not introducing new behavior.
 
 #### Add tests
+
+<details>
+<summary>Prompt</summary>
 
 ```
 You are writing the minimum unit test to pinpoint a specific recurring regression.
@@ -596,6 +669,8 @@ Output:
 - The fix to the underlying code.
 - Test run output showing the new unit test passing AND every previous test passing.
 ```
+
+</details>
 
 ## Habits that keep me honest
 
