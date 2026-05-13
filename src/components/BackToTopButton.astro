@@ -6,11 +6,28 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
 <div
   id="btt-btn-container"
   class:list={[
-    "fixed end-4 bottom-8 z-50",
-    "md:sticky md:end-auto md:float-end md:me-1",
+    "fixed end-4 bottom-8 z-50 flex flex-col items-end gap-2",
+    "md:sticky md:end-auto md:float-end md:me-1 md:flex-row md:items-center",
     "translate-y-14 opacity-0 transition duration-500",
   ]}
 >
+  <button
+    data-button="prev-section"
+    aria-label="Previous section"
+    class:list={[
+      "group bg-background px-2 py-1",
+      "size-10 rounded-full shadow-xl",
+      "md:h-8 md:w-fit md:rounded-md md:shadow-none md:focus-visible:rounded-none",
+      "md:bg-background/35 md:bg-clip-padding md:backdrop-blur-lg",
+    ]}
+  >
+    <IconChevronLeft class="inline-block rotate-90 md:hidden" />
+    <span class="sr-only text-sm group-hover:text-accent md:not-sr-only">
+      <IconChevronLeft class="inline-block size-4 rotate-90" />
+      Prev section
+    </span>
+  </button>
+
   <button
     data-button="back-to-top"
     class:list={[
@@ -30,27 +47,93 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
       Back To Top
     </span>
   </button>
+
+  <button
+    data-button="next-section"
+    aria-label="Next section"
+    class:list={[
+      "group bg-background px-2 py-1",
+      "size-10 rounded-full shadow-xl",
+      "md:h-8 md:w-fit md:rounded-md md:shadow-none md:focus-visible:rounded-none",
+      "md:bg-background/35 md:bg-clip-padding md:backdrop-blur-lg",
+    ]}
+  >
+    <IconChevronLeft class="inline-block -rotate-90 md:hidden" />
+    <span class="sr-only text-sm group-hover:text-accent md:not-sr-only">
+      Next section
+      <IconChevronLeft class="inline-block size-4 -rotate-90" />
+    </span>
+  </button>
 </div>
 
 <script is:inline data-astro-rerun>
-  /** Scrolls the document to the top when
-   * the "Back to Top" button is clicked. */
+  /** Wires the floating navigation buttons:
+   *  - Back to Top: scrolls to document start
+   *  - Prev / Next Section: scrolls to the adjacent <h2> / <h3> in the article
+   *  And drives the shared scroll-based visibility for the whole group. */
   function backToTop() {
     const rootElement = document.documentElement;
     const btnContainer = document.querySelector("#btt-btn-container");
     const backToTopBtn = document.querySelector("[data-button='back-to-top']");
+    const prevSectionBtn = document.querySelector("[data-button='prev-section']");
+    const nextSectionBtn = document.querySelector("[data-button='next-section']");
     const progressIndicator = document.querySelector("#progress-indicator");
 
     if (!rootElement || !btnContainer || !backToTopBtn || !progressIndicator)
       return;
 
-    // Attach click event handler for back-to-top button
+    // Back-to-top click handler
     backToTopBtn.addEventListener("click", () => {
       document.body.scrollTop = 0; // For Safari
       document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
     });
 
-    // Handle button visibility according to scroll position
+    // Prev / Next section click handlers
+    function getSections() {
+      const article = document.querySelector("article");
+      if (!article) return [];
+      return Array.from(article.querySelectorAll("h2, h3"));
+    }
+
+    function currentSectionIndex() {
+      const sections = getSections();
+      // Threshold ~120px to forgive small over-scroll past a heading
+      const threshold = 120;
+      let idx = -1;
+      for (let i = 0; i < sections.length; i++) {
+        const top = sections[i].getBoundingClientRect().top;
+        if (top <= threshold) {
+          idx = i;
+        } else {
+          break;
+        }
+      }
+      return idx;
+    }
+
+    if (prevSectionBtn) {
+      prevSectionBtn.addEventListener("click", () => {
+        const sections = getSections();
+        if (!sections.length) return;
+        const current = currentSectionIndex();
+        const targetIdx = Math.max(0, current - 1);
+        const target = sections[targetIdx];
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    if (nextSectionBtn) {
+      nextSectionBtn.addEventListener("click", () => {
+        const sections = getSections();
+        if (!sections.length) return;
+        const current = currentSectionIndex();
+        const targetIdx = Math.min(sections.length - 1, current + 1);
+        const target = sections[targetIdx];
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    // Handle visibility according to scroll position
     let lastVisible = null;
     function handleScroll() {
       const scrollTotal = rootElement.scrollHeight - rootElement.clientHeight;
