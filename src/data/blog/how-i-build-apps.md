@@ -26,7 +26,7 @@ I build apps in seven stages:
 
 After Stage 7 you have a deployed app with a real backend and an e2e suite covering every flow. Where you go from there is up to you — [a few directions worth knowing about](#you-can-take-it-from-here).
 
-Throughout this post we'll use a small **notes app** as a running example — sign up, list your notes, create / edit / delete, share with a teammate. Each stage has an "Example" collapsible showing what the notes app looks like at that stage, so the abstract operations have something concrete to land on.
+Throughout this post we'll use a **notes app** as a running example. You can sign up, list your notes, create / edit / delete, and share with a teammate. Each stage has an "Example" collapsible showing what the notes app looks like at that stage.
 
 ## Contents
 
@@ -44,19 +44,38 @@ Throughout this post we'll use a small **notes app** as a running example — si
 
 ## Why bother with a process
 
-Two things matter when you build with AI: **taste** (what you're building) and **evals** (knowing it works). Everything else is plumbing.
+Oversimplifying it, two things matter when you build with AI: 
+- **taste** (what you're building), and
+- **evals** (making sure it works)
 
-Most AI demos right now over-index on taste. A flashy 60-second video, a thread of screenshots, an agentic coding session that produces something impressive. Evals are conspicuously absent — at best a "vibe check" by the person who built it. That works fine for a toy. It falls apart fast.
+Most AI demos right now I believe over-index on taste. They're flashy 60-second videos, which works fine for marketing or prototyping. But when you want to bring it to life in a reliable way, you have to do more than vibe-code it. 
 
-The problem isn't the absence of tests in general — it's that **there's no widely-shared playbook for incrementally adding tests as a prototype grows**. The advice you find online is either "write unit tests for everything" (which gets you twenty paperweights against scaffolding you'll throw away next week) or "skip tests until you ship" (which means by the time you have something to ship, you can't remember what it's supposed to do).
+There's nothing wrong with using AI, you just have to graduate to [agentic engineering](https://x.com/karpathy/status/2026731645169185220), which means architecting it and testing it correctly.
 
-The "what it's supposed to do" part is the real bite. Any app with more than three or four screens has enough surface area that you lose track. Even at the demo stage, you can't hold the whole flow in your head — what happens when a user clicks Delete with two items selected? Does the autosuggest list dismiss on Escape? Does the share-flow's empty state show the right message? Without something that pins those expectations down, every regression stays invisible until somebody happens to stumble through that exact path.
+We have all the tools to do that. AI can definitely do it. The problem is that, AFAICT, **there's no widely-shared playbook for incrementally graduating a vibe-coded prototype to an angentically-engineered app**.
 
-There's a related cost most teams haven't named yet: **the UI flow isn't searchable**. "What is the share flow supposed to do?" lives in someone's head, in a stale PRD, in a Figma comment thread, in Slack scrollback. Business has one version of the contract; engineering has another; design has a third. Drift is invisible until a feature ships behaving wrong, and then everyone argues about which version was right.
+I'd love to write that playbook right now, but it'd be too time-consuming, and I think it'd be hopelessly out-of-date by the time I finished. So, instead, I'm going to write out how I build prototypes that
 
-Playwright e2e tests anchored to roles and labels *are* that contract — plain-text, queryable, executable. Business can ask an AI "what does the share flow do?" and get an authoritative answer because the AI reads the tests and answers in the user's own language ("the user clicks *Submit*, sees a heading *Note saved*, then…"). Engineering treats the tests as the source of truth for "what should happen when the user clicks Delete." Design audits against them. The same artifact serves all three.
+1. quickly prove out the concept, AND 
+2. are already setup to be agentically-engineered towards production.
 
-I wanted a process where the tests grow with the product — coarse at the start, granular when the shape stabilizes, cheap enough at every stage that there's no excuse to skip them. That's what this pipeline is.
+The two keys are:
+1. baking in tests from the very beginning, and
+2. having a process that's legible to business, design, and engineering.
+
+Any app with more than three or four screens has enough surface area that you lose track. Even at the demo stage, you can't hold the whole flow in your head. As you're vibe-coding, regressions stay invisible until you happen to stumble through that exact path. 
+
+And even if you could hold it all in your head, it's hard to communicate to your broader team at scale.
+
+Business people have their powerpoints and user stories. Design has their figma mockups. Engineering owns the app itself. There's a lot of opportunities for the nuances of the UI flow to be lost-in-translation.
+
+But now that businesses, design, etc are becoming more AI-forward, it makes a lot more sense to create a source of truth for UI flows that AI can examine.
+
+Playwright e2e tests can act as that source of truth. For the engineer as they build the app and for the app's stakeholders.
+
+So, I created a process where tests are there from the very beginning and grow with the product. They're coarse at the start and become more granular when the shape stabilizes. Having a process means the overhead is minimal enough at every stage that there's no excuse to skip them.
+
+That's what this pipeline is.
 
 ## Setup
 
