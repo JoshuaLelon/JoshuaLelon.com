@@ -1,0 +1,168 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Notes — wireframe</title>
+<style>
+  body { font-family: system-ui; margin: 0; color: #111; background: #fff; }
+  main { padding: 1rem; }
+  nav.dev { display: flex; gap: .75rem; padding: .5rem .75rem; background: #f3f4f6; border-bottom: 1px solid #d1d5db; font-size: .85rem; flex-wrap: wrap; }
+  section.screen { display: none; }
+  section.screen.active { display: block; }
+  form > * { display: block; margin: .35rem 0; }
+  textarea { width: 100%; min-height: 4rem; font: inherit; }
+  input, select, button { font: inherit; }
+  .btn { display: inline-block; padding: .3em .7em; border: 1px solid #888; background: #eee; text-decoration: none; color: inherit; cursor: pointer; }
+  dialog { display: block; border: 1px solid #999; padding: .6rem .75rem; margin: .75rem 0; background: #fafafa; }
+  aside.narration { border-left: 4px solid var(--c); background: var(--bg); padding: .5em .75em; margin: 1em 0; font-style: italic; }
+  /* Bucket prefix is for grep / a11y only; the colored bar conveys the bucket visually. */
+  aside.narration > strong:first-child { display: none; }
+  aside.narration.state     { --c: #3b82f6; --bg: #eff6ff; }
+  aside.narration.network   { --c: #10b981; --bg: #ecfdf5; }
+  aside.narration.style     { --c: #8b5cf6; --bg: #f5f3ff; }
+  aside.narration.framework { --c: #f59e0b; --bg: #fffbeb; }
+  aside.narration.backend   { --c: #ef4444; --bg: #fef2f2; }
+</style>
+</head>
+<body>
+<nav class="dev" aria-label="screens">
+  <a href="#home">home</a>
+  <a href="#signup">signup</a>
+  <a href="#login">login</a>
+  <a href="#notes">notes</a>
+  <a href="#new-note">new note</a>
+  <a href="#note">note</a>
+</nav>
+<main>
+  <section id="home" class="screen">
+    <h1>Notes</h1>
+    <p>A small place to keep your thoughts.</p>
+    <p><a class="btn" href="#signup">Sign up</a> &nbsp; <a class="btn" href="#login">Log in</a></p>
+  </section>
+
+  <section id="signup" class="screen">
+    <h1>Sign up</h1>
+    <form action="#notes" method="get">
+      <label for="su-email">Email</label>
+      <input id="su-email" type="email" required>
+      <label for="su-pw">Password</label>
+      <input id="su-pw" type="password" required>
+      <button type="submit">Create account</button>
+    </form>
+    <p>Already have an account? <a href="#login">Log in</a>.</p>
+  </section>
+
+  <section id="login" class="screen">
+    <h1>Log in</h1>
+    <form action="#notes" method="get">
+      <label for="li-email">Email</label>
+      <input id="li-email" type="email" required>
+      <label for="li-pw">Password</label>
+      <input id="li-pw" type="password" required>
+      <button type="submit">Log in</button>
+    </form>
+  </section>
+
+  <section id="notes" class="screen">
+    <header>
+      <h1>Your notes</h1>
+      <p><a class="btn" href="#new-note">New note</a></p>
+    </header>
+    <label for="sort">Sort by</label>
+    <select id="sort">
+      <option>Newest</option>
+      <option>Oldest</option>
+      <option>Title</option>
+    </select>
+    <aside class="narration state">
+      <strong>State-only —</strong>
+      Changing the sort dropdown re-renders the list below in the chosen order.
+    </aside>
+    <ul>
+      <li><a href="#note">Grocery list</a> — home, errands</li>
+      <li><a href="#note">Book ideas</a> — writing</li>
+      <li><a href="#note">Standup notes</a> — work</li>
+    </ul>
+  </section>
+
+  <section id="new-note" class="screen">
+    <header>
+      <h1>New note</h1>
+      <p><a href="#notes">Back to notes</a></p>
+    </header>
+    <form action="#note" method="get">
+      <label for="nn-title">Title</label>
+      <input id="nn-title" type="text" required>
+      <label for="nn-content">Content</label>
+      <textarea id="nn-content" required></textarea>
+      <label for="nn-tags">Tags</label>
+      <input id="nn-tags" type="text">
+      <aside class="narration network">
+        <strong>Network —</strong>
+        As the user types, autosuggest from prior tags appears as a listbox below the input.
+      </aside>
+      <button type="submit">Save</button>
+      <aside class="narration style">
+        <strong>Style —</strong>
+        On Submit, the card slides up off-screen and a green "Note saved" toast fades in from the bottom for ~3s.
+      </aside>
+    </form>
+  </section>
+
+  <section id="note" class="screen">
+    <header>
+      <h1>Grocery list</h1>
+      <p><a href="#notes">Back to notes</a></p>
+    </header>
+    <article>
+      <p>Milk, bread, eggs, apples.</p>
+      <p>Tags: home, errands</p>
+    </article>
+    <p><a class="btn" href="#notes">Delete</a> <a class="btn" href="#note">Share</a></p>
+    <dialog open>
+      <p>Delete this note?</p>
+      <p><button type="button">Confirm</button> <button type="button">Cancel</button></p>
+      <aside class="narration state">
+        <strong>State-only —</strong>
+        Opens when Delete is clicked; closes on Cancel or after Confirm.
+      </aside>
+    </dialog>
+    <dialog open>
+      <p>Share with a teammate</p>
+      <label for="share-email">Email</label>
+      <input id="share-email" type="email">
+      <p><button type="button">Send invite</button></p>
+    </dialog>
+  </section>
+</main>
+<script>
+  /* This demo lives in an iframe inside an Astro blog post. Astro's parent-page
+     ClientRouter intercepts same-origin link clicks, which breaks plain `:target`
+     routing here. So we route in JS, in the capture phase, before anything else
+     can grab the click. The actual Stage 1 artifact a reader produces is plain
+     HTML — this script only exists because of the embed context. */
+  function show(id) {
+    document.querySelectorAll('section.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href');
+    if (!href || !href.startsWith('#')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    show(href.slice(1));
+  }, true);
+  document.querySelectorAll('form').forEach(f => {
+    f.addEventListener('submit', e => {
+      const action = f.getAttribute('action');
+      if (action && action.startsWith('#')) {
+        e.preventDefault();
+        show(action.slice(1));
+      }
+    });
+  });
+  show('home');
+</script>
+</body>
+</html>

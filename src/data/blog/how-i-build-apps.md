@@ -220,7 +220,7 @@ Output:
 
    Narration tagging — strict:
    - Every <aside class="narration"> must also carry exactly one bucket class indicating which future stage will replace it: state, network, style, framework, or backend.
-   - The aside must open with a <strong> whose visible text matches the bucket: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". This is the human-readable label (the colors come from narrations.css; the prefix is the accessibility fallback and the grep target).
+   - The aside must open with a <strong> whose text matches the bucket exactly: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". The user never sees this prefix — narrations.css hides it with `display: none`. It exists solely as the grep target for later stages (e.g. `grep -l "Style —" *.html`) and as a stable hook for screen readers and tests. The colored side bar carries the visual signal.
    - Bucket meanings:
      - state — behaviors achievable with in-memory state alone (modals, dropdowns, sorting, filtering, list rendering from local state, tab switching, drag-and-drop within a page)
      - network — behaviors that need a request/response round trip (autosuggest, server errors, optimistic UI, save-then-reload)
@@ -242,6 +242,10 @@ Output:
      margin: 1em 0;
      font-style: italic;
    }
+   /* The bucket prefix (<strong>State-only —</strong>, etc.) is for grep
+      and accessibility tooling, not the human reader — the color bar
+      already conveys the bucket visually. */
+   aside.narration > strong:first-child { display: none; }
    aside.narration.state     { --c: #3b82f6; --bg: #eff6ff; }
    aside.narration.network   { --c: #10b981; --bg: #ecfdf5; }
    aside.narration.style     { --c: #8b5cf6; --bg: #f5f3ff; }
@@ -308,7 +312,7 @@ At Stage 1 you can't express animation, async state, real-time updates, drag int
 </aside>
 ```
 
-Each narration carries two markers: a **bucket class** on the aside (`state` / `network` / `style` / `framework` / `backend`) and a **bold prefix** matching the bucket exactly (`State-only —`, `Network —`, `Style —`, `Framework —`, `Backend —`). The class drives the color-coding in `narrations.css`; the prefix is the human-readable label that's always visible (accessibility-friendly even when color isn't perceivable) and the grep target for later stages — `grep -l "Style —" *.html` finds every style narration at Stage 5.
+Each narration carries two markers: a **bucket class** on the aside (`state` / `network` / `style` / `framework` / `backend`) and a **bold prefix** in a leading `<strong>` matching the bucket exactly (`State-only —`, `Network —`, `Style —`, `Framework —`, `Backend —`). The class drives the colored side bar in `narrations.css` — that's the only thing the human reader sees. The prefix itself is hidden with `display: none`; it lives in the HTML purely as a stable grep target for later stages (`grep -l "Style —" *.html` finds every style narration at Stage 5) and as a screen-reader / test hook that survives visual restyling.
 
 A narration is a placeholder *and* a specification, in one element. It marks where future behavior lives, and it describes that behavior precisely enough that the eventual test almost writes itself. As each later stage adds capability, narrations within reach of that capability get **replaced by implementation plus a test that asserts the narration's described behavior**. Narrations describing things still out of reach stay in place.
 
@@ -347,12 +351,15 @@ A strict subset of HTML is sufficient to describe the flow of any app, given tha
 
 <details>
 <summary>Example</summary>
+Let's say you tell your agent in chat:
 
-Before pasting Stage 1's Build prompt, I told the agent in chat: *"I want a small notes app — sign up, list my notes, create new ones with tags, and share a note with one teammate."*
+*"I want a small notes app — sign up, list my notes, create new ones with tags, and share a note with one teammate."*
 
-The agent's first pass had five screens but treated note creation and editing as separate flows. I asked it to combine them. It also asked whether *share* should be a public URL or an invite to a specific person — I picked invite, so it added a share-modal narration to the note view.
+You iterate with it a bit and come up with this:
 
-The flow we settled on:
+<figure style="margin:1.25rem 0;display:flex;flex-direction:column;border:1px solid var(--border);"><figcaption style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.8rem;padding:0.35rem 0.6rem;background:rgba(127,127,127,0.12);border-bottom:1px solid var(--border);">notes-wireframe/ — click the tabs at the top to walk through the flow</figcaption><iframe loading="lazy" src="/wireframes/notes-stage-1.html" style="width:100%;height:640px;border:0;background:white;"></iframe></figure>
+
+The flow is this:
 
 ```
 index.html → signup.html → notes.html ⇄ new-note.html
@@ -360,34 +367,6 @@ index.html → signup.html → notes.html ⇄ new-note.html
                             note.html  → (delete-confirm modal)
                                        → (share modal)
 ```
-
-A snippet of `new-note.html`:
-
-```html
-<form>
-  <label for="title">Title</label>
-  <input id="title" name="title" type="text" required>
-
-  <label for="content">Content</label>
-  <textarea id="content" name="content" required></textarea>
-
-  <label for="tags">Tags</label>
-  <input id="tags" name="tags" type="text">
-  <aside class="narration network">
-    <strong>Network —</strong>
-    As the user types, autosuggest from prior tags appears as a listbox.
-  </aside>
-
-  <button type="submit">Submit</button>
-  <aside class="narration style">
-    <strong>Style —</strong>
-    On Submit, the note slides up off the screen and a green
-    "Note saved" toast fades in for ~3s.
-  </aside>
-</form>
-```
-
-Four narrations end up authored across the screens, color-coded by bucket: `Style —` slide-up + toast and the hover state on note cards (purple), `State-only —` sort dropdown on the list and delete-confirm modal (blue), `Network —` tags autosuggest (green). The agent also drops `narrations.css` into the folder so every aside renders with the right colored side bar.
 
 </details>
 
