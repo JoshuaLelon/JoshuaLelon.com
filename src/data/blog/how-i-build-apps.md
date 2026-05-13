@@ -292,15 +292,10 @@ Output:
 <details>
 <summary>Background</summary>
 
-A folder of static `.html` files, one per screen, linked with `<a href>`s. The cheapest possible artifact for arguing about the *flow*. Static HTML beats Figma here because you can actually navigate it — you click through and feel whether the flow is right. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post for the framing.) If the flow is wrong, you'd rather discover it now than after you've wired up state management.
+At this point, it's a folder of static `.html` files, one per screen, linked with `<a href>`s. The cheapest possible artifact for establishing the *flow*. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post.)
 
-**Navigable but not stateful.** Links work, forms render, native disclosures and dialogs open — but when a user types into an input and clicks Submit, the typed value goes nowhere. A `<form>` with no `action` reloads the page; with `action="next.html"` it navigates, but the next page has no way to display what was typed (reading URL params needs JS). This is intentional: it lets you argue about the *flow* without anyone faking the *data flow* of later stages. The only meaningful assertions at this stage are structural — which is what the lint covers.
-
-- **Tech introduced:** HTML (the Wireframe HTML subset, defined below) for the artifact itself; one tiny `narrations.css` for color-coding narrations; Node + an HTML parser for the structural lint.
-- **Off-limits during Build:** all CSS *except* `narrations.css`; JavaScript; any framework; component libraries; build steps; package managers; any HTML element outside the subset.
-- **Narrations:** every behavior that can't be expressed in Wireframe HTML — animations, transitions, async loads, real-time updates, drag-and-drop, time-based events, media playback, custom inputs — lives in an `<aside class="narration BUCKET">` block at the point in the flow where it would occur, where `BUCKET` is one of `state`, `network`, `style`, `framework`, `backend`.
-
-**Narrations**
+<details>
+<summary>About Narrations</summary>
 
 At Stage 1 you can't express animation, async state, real-time updates, drag interactions, or anything time-dependent in pure static HTML. Rather than skip those parts of the flow or fake-stub them with broken UI, render them as **narration blocks** — and tag each one with its **bucket** so later stages know which to pick up:
 
@@ -327,9 +322,10 @@ Narrations sort into five buckets, each handled by a different stage. The pair s
 
 By the end of Stage 7, every narration has been replaced. The count of remaining narrations is a visible progress indicator.
 
-One rule: **narrations are version-controlled like code**, not comments to be deleted casually. They're the spec. Don't delete one without replacing it with implementation and a test.
+</details>
 
-**Wireframe HTML**
+<details>
+<summary>About Wireframe HTML</summary>
 
 A strict subset of HTML is sufficient to describe the flow of any app, given that narrations are the escape hatch. The rule for inclusion is one question: *does this element create a stable role-or-label locator a future Playwright test could target?* If yes, it's in. If no, it's a narration.
 
@@ -345,7 +341,7 @@ A strict subset of HTML is sufficient to describe the flow of any app, given tha
 - **SVG diagrams:** inline `<svg>` with `<title>` (required — it's the accessible name a test will locate by), `<desc>`, and the core shape children `<g>`, `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`, `<path>`, `<text>`. Use this for icons, arrows, status indicators, flow diagrams, simple charts — anything the agent can express as shapes.
 - **The escape hatch:** `<aside class="narration BUCKET">` where `BUCKET` is one of `state`, `network`, `style`, `framework`, `backend` — see the Narrations subsection above for the tagging rules.
 
-Notable omissions and where they go instead: `<img>`, `<canvas>`, `<video>`, `<audio>`, `<input type="range|color|file">`, anything requiring `<script>` → narrations. (For images: anything that needs real visual fidelity — logos, photos, screenshots — is a placeholder you don't have assets for yet, so describe what it's meant to convey. Anything simple enough to express as shapes belongs in inline `<svg>` instead.) Presentational tags (`<b>`, `<i>`, `<small>`, `<br>`, `<hr>`) → wait for Stage 5 styling.
+</details>
 
 </details>
 
