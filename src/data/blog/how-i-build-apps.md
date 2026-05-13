@@ -55,11 +55,9 @@ I wanted a process where the tests grow with the product. Coarse at the start, g
 
 ### Stage 1: Click-through prototype
 
-Generate static HTML wireframes — one file per screen, linked with `<a href>`s.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| HTML (Wireframe HTML subset); Node + HTML parser | Static HTML wireframes; clickable links between screens | Authored here (not replaced) |
+| HTML (Wireframe HTML subset); Node + HTML parser | Static HTML wireframes — one file per screen, linked with `<a href>`s | Authored here (not replaced) |
 
 **Steps:**
 
@@ -236,11 +234,9 @@ Four narrations end up authored across the screens (slide-up + toast, sort dropd
 
 ### Stage 2: Custom-input prototype
 
-Add the minimum vanilla JavaScript so typed input flows to the next screen.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| Vanilla JS (inline `<script>`); Playwright | Wireframes where typed input renders on the next screen | None — narrations stay in place |
+| Vanilla JS (inline `<script>`); Playwright | Wireframes plus the minimum inline JS so typed input renders on the next screen | None — narrations stay in place |
 
 **Steps:**
 
@@ -377,11 +373,9 @@ The four Stage 1 narrations stay in place — they all describe behavior beyond 
 
 ### Stage 3: Stateful prototype
 
-Refactor wireframes into React components with hooks for state.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| React, React hooks, Vite (or your bundler) | React app with global-ish state; unstyled | State-only |
+| React, React hooks, Vite (or your bundler) | React app refactored from the wireframes; hooks hold cross-screen state; unstyled | State-only |
 
 **Steps:**
 
@@ -500,11 +494,9 @@ Three narrations still in place: slide-up + toast (Stage 5), autosuggest tags (S
 
 ### Stage 4: Mocked network
 
-Add MSW; wire up `fetch` calls for network-dependent behaviors.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| MSW; `fetch` in the app | React app with mocked network; persisted-feel behaviors work | Network-dependent |
+| MSW; `fetch` in the app | React app with MSW as the network seam and `fetch` calls in place; persisted-feel behaviors work | Network-dependent |
 
 **Steps:**
 
@@ -618,11 +610,9 @@ Slide-up animation (Stage 5) and route transitions (Stage 6) stay narrated.
 
 ### Stage 5: Styled mockup
 
-Apply Tailwind + shadcn/ui across the components.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| Tailwind, shadcn/ui | Styled, polished React app — looks like an app | Style-only |
+| Tailwind, shadcn/ui | Styled, polished React app with Tailwind + shadcn/ui applied across components — looks like an app | Style-only |
 
 **Steps:**
 
@@ -719,11 +709,9 @@ The app reads as a real product now, not a sketch.
 
 ### Stage 6: Full prototype with mocked backend
 
-Migrate the prototype onto a routing framework of your choice.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| A routing framework of your choice (menu in Background) | Framework-routed app; still MSW-backed; demoable | Framework-dependent |
+| A routing framework of your choice (menu in Background) | Prototype migrated onto a routing framework; still MSW-backed; demoable to users without a backend | Framework-dependent |
 
 **Steps:**
 
@@ -840,11 +828,9 @@ Three narrations got replaced this stage:
 
 ### Stage 7: Backend slices
 
-Replace one MSW handler with a real backend route. Repeat.
-
 | Tech | Output | Narrations addressed |
 |---|---|---|
-| A backend stack of your choice (menu in Background) | Real backend behind one route; rest still MSW | Backend-dependent |
+| A backend stack of your choice (menu in Background) | One MSW handler replaced with a real backend route per iteration; the rest stay MSW until you migrate them | Backend-dependent |
 
 **Steps (repeat per handler):**
 
