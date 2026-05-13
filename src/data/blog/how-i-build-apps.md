@@ -65,7 +65,8 @@ A one-time install before Stage 1. The seven stages all assume you have a projec
 **Steps:**
 
 1. Make sure you have Node installed (any recent LTS).
-2. Paste the **Setup prompt**. The agent initializes the project, installs every dependency the pipeline will touch, downloads Playwright's browser binaries, and writes the minimal config files. No app code yet — that's Stage 1's job.
+2. Open the AI in (or `cd` into) the empty directory where you want the project to live — the agent scaffolds everything in its current working directory.
+3. Paste the **Setup prompt**. The agent initializes the project, installs every dependency the pipeline will touch, downloads Playwright's browser binaries, and writes the minimal config files. No app code yet — that's Stage 1's job.
 
 <details>
 <summary>Setup prompt</summary>
@@ -73,7 +74,10 @@ A one-time install before Stage 1. The seven stages all assume you have a projec
 ```
 You are setting up the project scaffold I'll use across all seven stages of the build pipeline. Defaults: React + Vite + Tailwind + shadcn-style components, Playwright + MSW for tests, an HTML parser for Stage 1's structural lint.
 
-Step 0 — ask me for the project name, then wait for my answer. That's the only thing you need from me; default everything else to sensible values.
+Step 0 — confirm where you're working:
+- Print your current working directory.
+- Ask me to confirm this is where I want the project to live. If I say no, wait until I `cd` to the right place (and tell you to start over) before doing anything else.
+- Then ask me for the project name. That's the only other thing you need from me; default everything else to sensible values.
 
 Steps — once I've answered, do them in order:
 
