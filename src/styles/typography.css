@@ -79,11 +79,11 @@
     }
 
     details {
-      @apply block cursor-pointer text-foreground select-none;
+      @apply block text-foreground;
     }
 
     summary {
-      @apply focus-visible:no-underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus-visible:outline-dashed;
+      @apply cursor-pointer select-none focus-visible:no-underline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus-visible:outline-dashed;
     }
 
     pre {
