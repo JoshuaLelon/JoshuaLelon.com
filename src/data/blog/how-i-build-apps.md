@@ -69,7 +69,7 @@ I wanted a process where the tests grow with the product. Coarse at the start, g
 <details>
 <summary>Build prompt</summary>
 
-```
+````
 You are wireframing the web app we just discussed.
 
 Cover the core flows: the primary value flow plus the supporting flows (sign-up / auth, settings, etc.) that the app needs. If a flow we haven't talked about yet should obviously exist, propose it inline and continue.
@@ -77,7 +77,8 @@ Cover the core flows: the primary value flow plus the supporting flows (sign-up 
 Constraints — strict:
 - Only static .html files. One file per screen.
 - <a href="..."> is the ONLY legal way to move between screens.
-- NO CSS. NO JavaScript. NO frameworks. NO component libraries. NO build step. NO package.json. NO tests.
+- NO JavaScript. NO frameworks. NO component libraries. NO build step. NO package.json. NO tests.
+- Exactly ONE CSS file is allowed: narrations.css, holding only the color-coding rules for narration asides (see Narration tagging below). NO other CSS.
 - Allowed HTML elements only (the "Wireframe HTML" subset):
   - Scaffold: <!doctype html>, <html>, <head>, <title>, <body>
   - Regions: <main>, <header>, <footer>, <nav>, <section>, <article>
@@ -89,16 +90,44 @@ Constraints — strict:
   - Links: <a href>
   - Forms: <form>, <fieldset>, <legend>, <label for>, <input> (types: text, email, password, number, tel, url, search, date, checkbox, radio, hidden, submit), <textarea>, <select>, <option>, <button>
   - SVG diagrams: <svg> with <title> (required), <desc>, and shape children (<g>, <rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>, <path>, <text>). Use this for icons, arrows, status indicators, flow diagrams, simple charts.
-  - Narrations: <aside class="narration">
-- Any element NOT in this list is forbidden. If you need behavior requiring a forbidden element (<img>, <canvas>, <video>, <audio>, range/color/file inputs, anything needing <script>), insert an <aside class="narration"> at that point describing in plain English what should happen, when, and why. Be specific enough that a future test could be written from the narration alone.
+  - Narrations: <aside class="narration BUCKET">…</aside> where BUCKET is one of: state, network, style, framework, backend (see Narration tagging below).
+- Any element NOT in this list is forbidden. If you need behavior requiring a forbidden element (<img>, <canvas>, <video>, <audio>, range/color/file inputs, anything needing <script>), insert an <aside class="narration BUCKET"> at that point describing in plain English what should happen, when, and why. Be specific enough that a future test could be written from the narration alone.
 - For images specifically: if it needs real visual fidelity (logos, photos, screenshots), use a narration describing what it conveys. If it can be expressed as shapes (icons, arrows, status indicators, simple charts), use inline <svg> with a <title>.
 - Use proper heading hierarchy. Use <label for="..."> on every form input. Every <svg> must have a <title>. Accessible names matter — they will become test locators in the next stage.
+
+Narration tagging — strict:
+- Every <aside class="narration"> must also carry exactly one bucket class indicating which future stage will replace it: state, network, style, framework, or backend.
+- The aside must open with a <strong> whose visible text matches the bucket: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". This is the human-readable label (the colors come from narrations.css; the prefix is the accessibility fallback and the grep target).
+- Bucket meanings:
+  - state — behaviors achievable with in-memory state alone (modals, dropdowns, sorting, filtering, list rendering from local state, tab switching, drag-and-drop within a page)
+  - network — behaviors that need a request/response round trip (autosuggest, server errors, optimistic UI, save-then-reload)
+  - style — visual fidelity (specific card layouts, animations, transitions, hover states, color schemes, focus indicators, spacing)
+  - framework — routing/loading concerns (route transitions, loading states tied to navigation, redirects, auth-gated routes, server-rendered initial state)
+  - backend — behaviors that need a real server (persistence across page reloads, real auth sessions, real-time server events, anything where the actual response shapes behavior)
+- Link narrations.css from every .html file's <head>.
 
 Output:
 - A folder of .html files I can open directly in a browser.
 - A short index.html with a list of all flows and entry points.
-- No other files.
+- narrations.css containing exactly these rules:
+
 ```
+aside.narration {
+  border-left: 4px solid var(--c);
+  background: var(--bg);
+  padding: 0.5em 0.75em;
+  margin: 1em 0;
+  font-style: italic;
+}
+aside.narration.state     { --c: #3b82f6; --bg: #eff6ff; }
+aside.narration.network   { --c: #10b981; --bg: #ecfdf5; }
+aside.narration.style     { --c: #8b5cf6; --bg: #f5f3ff; }
+aside.narration.framework { --c: #f59e0b; --bg: #fffbeb; }
+aside.narration.backend   { --c: #ef4444; --bg: #fef2f2; }
+```
+
+- No other files.
+````
 
 </details>
 
@@ -119,9 +148,10 @@ Assertions — must all pass:
 2. Every <svg> element has a <title> direct child with non-empty text.
 3. Every .html file has exactly one <h1>. Heading levels within a file do not skip (i.e. no <h3> appears before any <h2> within the same document).
 4. Every <a href="..."> pointing to a relative path resolves to an existing file in the wireframe folder.
+5. Every <aside class="narration ..."> carries exactly one bucket class from {state, network, style, framework, backend} AND its first child is a <strong> whose text matches the bucket exactly: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". (Catches taxonomy drift early.)
 
 Tracked metrics — report but do not fail on:
-- Count of <aside class="narration"> blocks per file and total across the wireframe.
+- Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
 
 Output:
 - tests/wireframe-lint.mjs (the script).
@@ -138,31 +168,34 @@ A folder of static `.html` files, one per screen, linked with `<a href>`s. The c
 
 **Navigable but not stateful.** Links work, forms render, native disclosures and dialogs open — but when a user types into an input and clicks Submit, the typed value goes nowhere. A `<form>` with no `action` reloads the page; with `action="next.html"` it navigates, but the next page has no way to display what was typed (reading URL params needs JS). This is intentional: it lets you argue about the *flow* without anyone faking the *data flow* of later stages. The only meaningful assertions at this stage are structural — which is what the lint covers.
 
-- **Tech introduced:** HTML (the Wireframe HTML subset, defined below) for the artifact itself; Node + an HTML parser for the structural lint.
-- **Off-limits during Build:** CSS, JavaScript, any framework, component libraries, build steps, package managers, any HTML element outside the subset.
-- **Narrations:** every behavior that can't be expressed in Wireframe HTML — animations, transitions, async loads, real-time updates, drag-and-drop, time-based events, media playback, custom inputs — lives in an `<aside class="narration">` block at the point in the flow where it would occur.
+- **Tech introduced:** HTML (the Wireframe HTML subset, defined below) for the artifact itself; one tiny `narrations.css` for color-coding narrations; Node + an HTML parser for the structural lint.
+- **Off-limits during Build:** all CSS *except* `narrations.css`; JavaScript; any framework; component libraries; build steps; package managers; any HTML element outside the subset.
+- **Narrations:** every behavior that can't be expressed in Wireframe HTML — animations, transitions, async loads, real-time updates, drag-and-drop, time-based events, media playback, custom inputs — lives in an `<aside class="narration BUCKET">` block at the point in the flow where it would occur, where `BUCKET` is one of `state`, `network`, `style`, `framework`, `backend`.
 
 **Narrations**
 
-At Stage 1 you can't express animation, async state, real-time updates, drag interactions, or anything time-dependent in pure static HTML. Rather than skip those parts of the flow or fake-stub them with broken UI, render them as **narration blocks**:
+At Stage 1 you can't express animation, async state, real-time updates, drag interactions, or anything time-dependent in pure static HTML. Rather than skip those parts of the flow or fake-stub them with broken UI, render them as **narration blocks** — and tag each one with its **bucket** so later stages know which to pick up:
 
 ```html
-<aside class="narration">
+<aside class="narration style">
+  <strong>Style —</strong>
   When the user clicks Submit, the note slides up off the screen with a
   200ms ease-out, then a green toast fades in from the bottom reading
   "Note saved" and disappears after 3 seconds.
 </aside>
 ```
 
+Each narration carries two markers: a **bucket class** on the aside (`state` / `network` / `style` / `framework` / `backend`) and a **bold prefix** matching the bucket exactly (`State-only —`, `Network —`, `Style —`, `Framework —`, `Backend —`). The class drives the color-coding in `narrations.css`; the prefix is the human-readable label that's always visible (accessibility-friendly even when color isn't perceivable) and the grep target for later stages — `grep -l "Style —" *.html` finds every style narration at Stage 5.
+
 A narration is a placeholder *and* a specification, in one element. It marks where future behavior lives, and it describes that behavior precisely enough that the eventual test almost writes itself. As each later stage adds capability, narrations within reach of that capability get **replaced by implementation plus a test that asserts the narration's described behavior**. Narrations describing things still out of reach stay in place.
 
-Narrations sort into five buckets, each handled by a different stage:
+Narrations sort into five buckets, each handled by a different stage. The pair shown after each bucket is its `class` and bold prefix:
 
-- **State-only narrations** — behaviors achievable with React and in-memory state alone: in-memory modal/dropdown toggles, client-side sorting and filtering, list rendering from local state, tab switching, in-page accordions. **Stage 3** picks these off.
-- **Network-dependent narrations** — behaviors needing a network seam: autosuggest (debounced fetch), server errors, optimistic UI with rollback, save-then-reload round trips, anything where the response shape matters. **Stage 4** picks these off.
-- **Style-only narrations** — behaviors specifying visual fidelity: specific card layouts, animations and transitions, hover states, color schemes, focus indicators, spacing rhythms. **Stage 5** picks these off.
-- **Framework-dependent narrations** — behaviors needing a routing framework: route transitions, loading states tied to navigation, redirects after form submission, auth-gated routes, server-rendered initial state. **Stage 6** picks these off.
-- **Backend-dependent narrations** — behaviors needing a real server: persistence across page reloads, real auth sessions, real-time server events, anything where the server's actual response shapes behavior (rate limits, conflict resolution, etc.). **Stage 7** picks these off, one route at a time.
+- **State-only narrations** *(`state`, "State-only —")* — behaviors achievable with React and in-memory state alone: in-memory modal/dropdown toggles, client-side sorting and filtering, list rendering from local state, tab switching, in-page accordions. **Stage 3** picks these off.
+- **Network-dependent narrations** *(`network`, "Network —")* — behaviors needing a network seam: autosuggest (debounced fetch), server errors, optimistic UI with rollback, save-then-reload round trips, anything where the response shape matters. **Stage 4** picks these off.
+- **Style-only narrations** *(`style`, "Style —")* — behaviors specifying visual fidelity: specific card layouts, animations and transitions, hover states, color schemes, focus indicators, spacing rhythms. **Stage 5** picks these off.
+- **Framework-dependent narrations** *(`framework`, "Framework —")* — behaviors needing a routing framework: route transitions, loading states tied to navigation, redirects after form submission, auth-gated routes, server-rendered initial state. **Stage 6** picks these off.
+- **Backend-dependent narrations** *(`backend`, "Backend —")* — behaviors needing a real server: persistence across page reloads, real auth sessions, real-time server events, anything where the server's actual response shapes behavior (rate limits, conflict resolution, etc.). **Stage 7** picks these off, one route at a time.
 
 By the end of Stage 7, every narration has been replaced. The count of remaining narrations is a visible progress indicator.
 
@@ -182,7 +215,7 @@ A strict subset of HTML is sufficient to describe the flow of any app, given tha
 - **Links:** `<a href>` — the only legal way to move between screens.
 - **Forms:** `<form>`, `<fieldset>`, `<legend>`, `<label for>`, `<input>` (types `text`, `email`, `password`, `number`, `tel`, `url`, `search`, `date`, `checkbox`, `radio`, `hidden`, `submit`), `<textarea>`, `<select>`, `<option>`, `<button>`.
 - **SVG diagrams:** inline `<svg>` with `<title>` (required — it's the accessible name a test will locate by), `<desc>`, and the core shape children `<g>`, `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`, `<path>`, `<text>`. Use this for icons, arrows, status indicators, flow diagrams, simple charts — anything the agent can express as shapes.
-- **The escape hatch:** `<aside class="narration">`.
+- **The escape hatch:** `<aside class="narration BUCKET">` where `BUCKET` is one of `state`, `network`, `style`, `framework`, `backend` — see the Narrations subsection above for the tagging rules.
 
 Notable omissions and where they go instead: `<img>`, `<canvas>`, `<video>`, `<audio>`, `<input type="range|color|file">`, anything requiring `<script>` → narrations. (For images: anything that needs real visual fidelity — logos, photos, screenshots — is a placeholder you don't have assets for yet, so describe what it's meant to convey. Anything simple enough to express as shapes belongs in inline `<svg>` instead.) Presentational tags (`<b>`, `<i>`, `<small>`, `<br>`, `<hr>`) → wait for Stage 5 styling.
 
@@ -216,19 +249,21 @@ A snippet of `new-note.html`:
 
   <label for="tags">Tags</label>
   <input id="tags" name="tags" type="text">
-  <aside class="narration">
+  <aside class="narration network">
+    <strong>Network —</strong>
     As the user types, autosuggest from prior tags appears as a listbox.
   </aside>
 
   <button type="submit">Submit</button>
-  <aside class="narration">
+  <aside class="narration style">
+    <strong>Style —</strong>
     On Submit, the note slides up off the screen and a green
     "Note saved" toast fades in for ~3s.
   </aside>
 </form>
 ```
 
-Four narrations end up authored across the screens (slide-up + toast, sort dropdown on the list, delete-confirm modal, tags autosuggest). Everything else is plain Wireframe HTML.
+Four narrations end up authored across the screens, color-coded by bucket: `Style —` slide-up + toast and the hover state on note cards (purple), `State-only —` sort dropdown on the list and delete-confirm modal (blue), `Network —` tags autosuggest (green). The agent also drops `narrations.css` into the folder so every aside renders with the right colored side bar.
 
 </details>
 
@@ -400,14 +435,16 @@ Still OFF-LIMITS — strict:
 - No routing framework. Single-page app or per-screen entry points served by the bundler; navigation via `<a href>` or framework-free `history.pushState`.
 - No real backend, no real database, no auth provider.
 
-For every <aside class="narration"> block:
-- If the narrated behavior is achievable with React + in-memory state alone (in-memory modal/dropdown toggles, client-side sorting/filtering, list rendering from local state, tab switching, in-page accordions, drag-and-drop within a page), REPLACE the narration with the real implementation. Do NOT write tests for it in this sub-stage — that comes next.
-- If the narration needs network calls, styling fidelity, framework routing, or a backend, LEAVE IT IN PLACE unchanged.
+For every narration tagged with the `state` class (i.e. every `<aside class="narration state">` opening with `<strong>State-only —</strong>`):
+- REPLACE the narration with the real implementation in React + in-memory state.
+- Do NOT write tests for it in this sub-stage — that comes next.
+
+Leave every other narration in place — they belong to later stages (`network`, `style`, `framework`, `backend`).
 
 Output:
 - The React app.
-- A list of <aside class="narration"> blocks that were replaced this stage, with the verbatim text of each. This list drives the next sub-stage's tests.
-- A list of remaining <aside class="narration"> blocks, partitioned by category (network-dependent, style-only, framework-dependent, backend-dependent).
+- A list of the replaced state narrations with the verbatim text of each (this list drives the next sub-stage's tests).
+- A list of remaining narrations grouped by bucket class.
 ```
 
 </details>
@@ -519,15 +556,17 @@ Still OFF-LIMITS — strict:
 - No routing framework.
 - No real backend, no real database, no auth provider.
 
-For every <aside class="narration"> block remaining:
-- If the narrated behavior needs the network seam (autosuggest with debounced fetch, server errors, optimistic UI with rollback, save-then-reload round trips, anything where a response shape matters), REPLACE the narration with the real implementation. Do NOT write tests for it in this sub-stage — that comes next.
-- If the narration needs styling fidelity, framework routing, or a real backend, LEAVE IT IN PLACE.
+For every narration tagged with the `network` class (i.e. every `<aside class="narration network">` opening with `<strong>Network —</strong>`):
+- REPLACE the narration with the real implementation using `fetch` + an MSW handler.
+- Do NOT write tests for it in this sub-stage — that comes next.
+
+Leave every other narration in place — they belong to later stages (`style`, `framework`, `backend`).
 
 Output:
 - The updated React app with `fetch` calls and an MSW setup.
 - `tests/handlers.ts` with mock handlers for every network call the app makes.
-- A list of <aside class="narration"> blocks that were replaced this stage, with verbatim text. This list drives the next sub-stage's tests.
-- A list of remaining <aside class="narration"> blocks, partitioned by category (style-only, framework-dependent, backend-dependent).
+- A list of the replaced network narrations with verbatim text (this list drives the next sub-stage's tests).
+- A list of remaining narrations grouped by bucket class.
 ```
 
 </details>
@@ -634,16 +673,19 @@ Still OFF-LIMITS — strict:
 - No routing framework.
 - No real backend, no real database, no auth provider.
 
-For every <aside class="narration"> block remaining:
-- If the narrated behavior is style-only (a specific card layout, an animation, a hover state, a color scheme, a focus indicator, spacing), REPLACE the narration with the real implementation.
-- If the narration needs framework routing or a real backend, LEAVE IT IN PLACE.
+For every narration tagged with the `style` class (i.e. every `<aside class="narration style">` opening with `<strong>Style —</strong>`):
+- REPLACE the narration with the real implementation using Tailwind + shadcn/ui (or your chosen styling stack).
+
+Leave every other narration in place — they belong to later stages (`framework`, `backend`).
 
 Critical constraint: **preserve accessible names**. Every `<button>` named "Submit" must remain findable as `getByRole('button', { name: 'Submit' })` after styling. If shadcn/ui's wrapper components change the underlying role (rare but possible), adjust the wrapping so accessibility roles are preserved. Do NOT add test IDs to compensate; fix the markup.
 
+Once the style narrations are gone, the `narrations.css` color-coding file is no longer needed; you may remove it (or leave it — the remaining `framework` and `backend` asides still color-code cleanly).
+
 Output:
 - The styled app.
-- A list of <aside class="narration"> blocks that were replaced this stage, with verbatim text — flagged by whether each is independently testable (animations triggered by user action: yes; static color schemes: no, just visual). This list drives the next sub-stage's tests.
-- A list of remaining <aside class="narration"> blocks (these should all be framework- or backend-dependent at this point).
+- A list of the replaced style narrations with verbatim text — flagged by whether each is independently testable (animations triggered by user action: yes; static color schemes: no, just visual). This list drives the next sub-stage's tests.
+- A list of remaining narrations grouped by bucket class (these should all be `framework` or `backend` at this point).
 ```
 
 </details>
@@ -738,15 +780,17 @@ Still OFF-LIMITS — strict:
 - Do NOT delete any handlers from tests/handlers.ts.
 - Do NOT introduce a server-side ORM or query layer.
 
-For every remaining <aside class="narration"> block:
-- If the narrated behavior depends on framework features (loading states, route transitions, redirects, suspense, error boundaries, auth-gated routes, optimistic UI tied to navigation), REPLACE the narration with the real implementation. Do NOT write tests for it in this sub-stage — that comes next.
-- If the narration describes backend-dependent behavior, LEAVE IT IN PLACE.
+For every narration tagged with the `framework` class (i.e. every `<aside class="narration framework">` opening with `<strong>Framework —</strong>`):
+- REPLACE the narration with the real implementation using the framework's primitives (loaders, suspense boundaries, redirects, navigation hooks).
+- Do NOT write tests for it in this sub-stage — that comes next.
+
+Leave every `backend` narration in place — Stage 7 handles those.
 
 Output:
 - The framework-migrated app.
 - Updated tests/handlers.ts if new mocked endpoints emerged from framework data-loading patterns.
-- A list of <aside class="narration"> blocks that were replaced this stage, with the verbatim text of each. This list drives the next sub-stage's tests.
-- A list of remaining <aside class="narration"> blocks (these should all be backend-dependent at this point).
+- A list of the replaced framework narrations with verbatim text (this list drives the next sub-stage's tests).
+- A list of remaining narrations — all should be `backend` at this point.
 ```
 
 </details>
@@ -854,7 +898,7 @@ Steps — in order, do not skip:
 1. Read the existing MSW handler in tests/handlers.ts to learn the exact request and response shape.
 2. Implement the real route with the SAME request and response contract. If the real implementation genuinely cannot match the contract, STOP and explain why before proceeding — do not silently change the contract.
 3. Delete only that one handler from tests/handlers.ts.
-4. If any <aside class="narration"> block in the frontend is tied to this endpoint, replace it with real UI now. Note its verbatim text for the next sub-stage.
+4. If any `<aside class="narration backend">` (i.e. opening with `<strong>Backend —</strong>`) in the frontend is tied to this endpoint, replace it with real UI now. Note its verbatim text for the next sub-stage.
 
 Constraints — strict:
 - Change ONLY this one route this iteration. Do not touch other handlers or other routes.
