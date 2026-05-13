@@ -120,9 +120,6 @@ Output:
 
 1. Make sure you've run the [Setup](#setup) prompt first — the rest of these steps assume the project scaffold is in place.
 2. Tell the AI in chat about the app you want to build — what it does, who it's for, the main flows. **Optional:** if you'd rather be interviewed than dictate, paste the **Interview prompt** below and answer one question at a time.
-3. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
-4. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
-5. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves, every narration is tagged.
 
 <details>
 <summary>Interview prompt (optional)</summary>
@@ -162,6 +159,10 @@ Rules for the interview:
 ```
 
 </details>
+
+3. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
+4. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
+5. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves, every narration is tagged.
 
 <details>
 <summary>Build prompt</summary>
