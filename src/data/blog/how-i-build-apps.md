@@ -67,16 +67,24 @@ A one-time install before Stage 1. The seven stages all assume you have a projec
 ```
 You are setting up the project scaffold I'll use across all seven stages of the build pipeline. Defaults: React + Vite + Tailwind + shadcn-style components, Playwright + MSW for tests, an HTML parser for Stage 1's structural lint.
 
-Steps — do them in order:
+Step 0 — ask me first, then wait for my answers before proceeding:
+- Project name (used as the package.json "name" and the directory name)
+- One-line description (used as the package.json "description")
+- Author name + optional email (for package.json "author")
+- License (default MIT)
+- Node version preference, if any (default: my current LTS)
+- Anything else you'd normally collect from `npm init` that you want explicit about
+
+Steps — once I've answered, do them in order:
 
 1. Initialize:
-   - npm init -y
-   - git init; write a sensible .gitignore for Node + Vite + Playwright (include at least: node_modules, dist, test-results, playwright-report, .env, .DS_Store).
+   - Write package.json from my answers above (do NOT use `npm init -y` defaults).
+   - `git init` and write a sensible .gitignore for Node + Vite + Playwright (include at least: node_modules, dist, test-results, playwright-report, .env, .DS_Store).
 
-2. Install dependencies, latest stable versions:
+2. Install dependencies at LATEST STABLE versions. Your training data is likely months or years stale, so don't trust remembered version numbers. For each package below, run `npm view <pkg> version` to discover the current latest, then install with the explicit `@latest` tag (e.g. `npm install -D @playwright/test@latest`) so npm resolves freshly rather than falling back to anything cached.
    - Locked-in test tools (devDependencies): @playwright/test, msw
    - HTML parser for the Stage 1 lint (devDependencies): node-html-parser (or pick cheerio / linkedom — your call, just one)
-   - Default runtime + bundler: react, react-dom; @vitejs/plugin-react, vite (devDependencies)
+   - Default runtime + bundler: react, react-dom (dependencies); @vitejs/plugin-react, vite (devDependencies)
    - Default styling (devDependencies, only set up the configs — actual class usage starts at Stage 5): tailwindcss, postcss, autoprefixer
    - TypeScript (devDependencies): typescript, @types/react, @types/react-dom, @types/node
 
@@ -96,8 +104,9 @@ Steps — do them in order:
 If I plan to swap a default later (e.g. Svelte instead of React, or Pico.css instead of Tailwind), I'll uninstall and replace at the relevant stage. For now: assume the defaults.
 
 Output:
-- The project shell, ready for me to start Stage 1.
+- The project shell at the project name I gave you, ready for me to start Stage 1.
 - A short README.md naming each npm script and one-liner usage.
+- Print the resolved versions for every package you installed (the actual versions npm fetched, not what you remembered) so I have a record.
 - Tell me which HTML parser you picked and why.
 ```
 
