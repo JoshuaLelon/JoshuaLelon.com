@@ -129,22 +129,44 @@ Output:
 <details>
 <summary>Example</summary>
 
-A handful of static `.html` files linked with `<a href>`s:
+Before pasting Stage 1's Build prompt, I told the agent in chat: *"I want a small notes app — sign up, list my notes, create new ones with tags, and share a note with one teammate."*
 
-- `index.html` — landing page, link to sign-up
-- `signup.html`, `login.html` — auth screens (forms only; submitting goes nowhere yet)
-- `notes.html` — the list view (a static `<ul>` with a placeholder row or two)
-- `new-note.html` — the create form (Title, Content, Tags)
-- `note.html` — the detail / edit view
+The agent's first pass had five screens but treated note creation and editing as separate flows. I asked it to combine them. It also asked whether *share* should be a public URL or an invite to a specific person — I picked invite, so it added a share-modal narration to the note view.
 
-A handful of narrations authored along the way:
+The flow we settled on:
 
-- In `new-note.html`: *"When the user clicks Submit, the note slides up off the screen with a 200ms ease-out, then a green toast fades in reading 'Note saved.'"*
-- In `notes.html`: *"A sort dropdown above the list switches the order: newest first / oldest first / alphabetical by title."*
-- In `note.html`: *"Clicking Delete opens a modal asking 'Are you sure?' with Cancel and Confirm buttons."*
-- In `new-note.html`: *"As the user types in the Tags field, an autosuggest list shows existing tags from prior notes."*
+```
+index.html → signup.html → notes.html ⇄ new-note.html
+                                ↕
+                            note.html  → (delete-confirm modal)
+                                       → (share modal)
+```
 
-The nav has a pencil-and-paper icon as inline `<svg>` with `<title>` "Notes app".
+A snippet of `new-note.html`:
+
+```html
+<form>
+  <label for="title">Title</label>
+  <input id="title" name="title" type="text" required>
+
+  <label for="content">Content</label>
+  <textarea id="content" name="content" required></textarea>
+
+  <label for="tags">Tags</label>
+  <input id="tags" name="tags" type="text">
+  <aside class="narration">
+    As the user types, autosuggest from prior tags appears as a listbox.
+  </aside>
+
+  <button type="submit">Submit</button>
+  <aside class="narration">
+    On Submit, the note slides up off the screen and a green
+    "Note saved" toast fades in for ~3s.
+  </aside>
+</form>
+```
+
+Four narrations end up authored across the screens (slide-up + toast, sort dropdown on the list, delete-confirm modal, tags autosuggest). Everything else is plain Wireframe HTML.
 
 </details>
 
@@ -265,10 +287,12 @@ Output:
 <details>
 <summary>Example</summary>
 
-Same `.html` files as Stage 1, plus a small inline `<script>` in `new-note.html` and `note.html`:
+Stage 1's Add tests prompt produced the structural lint, which flagged one input on the share modal that was missing a `<label for>`. I asked the agent to fix it; it patched the wireframe and the lint went green.
+
+Then Stage 2's Build prompt. The agent asked whether to carry form values via URL params or `sessionStorage`. I picked URL params — simpler, less hidden state, and Playwright can verify the URL too. It added inline `<script>` to `new-note.html` and `note.html`:
 
 ```html
-<!-- new-note.html -->
+<!-- new-note.html, appended -->
 <script>
   document.querySelector('form').addEventListener('submit', e => {
     e.preventDefault();
@@ -279,7 +303,7 @@ Same `.html` files as Stage 1, plus a small inline `<script>` in `new-note.html`
 ```
 
 ```html
-<!-- note.html -->
+<!-- note.html, appended -->
 <script>
   const params = new URLSearchParams(location.search);
   document.querySelector('h1').textContent = params.get('title') || 'Untitled';
@@ -287,7 +311,7 @@ Same `.html` files as Stage 1, plus a small inline `<script>` in `new-note.html`
 </script>
 ```
 
-One Playwright test, `tests/e2e/create-note.test.ts`:
+Stage 2's Add tests prompt landed one Playwright test per flow. The "create note" one:
 
 ```ts
 test('create note flow', async ({ page }) => {
@@ -299,7 +323,7 @@ test('create note flow', async ({ page }) => {
 });
 ```
 
-All four Stage 1 narrations stay untouched — they describe behavior beyond this stage's reach.
+The four Stage 1 narrations stay in place — they all describe behavior beyond what plain JS can deliver here.
 
 </details>
 
@@ -401,22 +425,44 @@ Output:
 <details>
 <summary>Example</summary>
 
-The wireframes are refactored into React components:
+Stage 3's Build prompt refactored the HTML into React. The agent picked Vite as the bundler without asking — that's the default; fine. It proposed `useReducer` for the notes collection since we'll be appending and removing entries; I agreed.
 
-- `App.jsx` — root with `<Routes>` (still a simple client router; framework migration is Stage 6)
-- `NotesList.jsx` — renders the list, owns the sort dropdown
-- `NoteForm.jsx` — create / edit form
-- `NoteDetail.jsx` — read view with Delete button + confirm modal
-- `NotesContext.jsx` — `useReducer` holding the notes array in memory
+The component tree it landed on:
 
-Narrations *replaced this stage*:
+```
+App
+├─ NotesProvider     — useReducer over notes[]
+└─ Routes
+   ├─ NotesList      — sort dropdown + list of links
+   ├─ NoteForm       — create / edit form
+   └─ NoteDetail     — read view, Delete button, delete-confirm modal
+```
 
-- **Sort dropdown** → a `<select>` with `useState`; `NotesList` re-renders a `useMemo`-sorted array
-- **Delete-confirm modal** → a controlled boolean state in `NoteDetail`; an unstyled `<div role="dialog">` with Cancel and Confirm
+Two narrations got replaced this stage:
 
-Narrations *still in place*: slide-up + toast on save (needs styling), autosuggest tags (needs network), route transitions (needs framework routing).
+- **Sort dropdown** → a `<select>` with `useState`; the list re-renders a `useMemo`-sorted array.
+- **Delete-confirm modal** → a controlled boolean state, rendered as an unstyled `<div role="dialog">` with Cancel / Confirm.
 
-The app looks bare — no Tailwind, no shadcn — but the state model is right.
+The sort, in code:
+
+```jsx
+function NotesList({ notes }) {
+  const [sort, setSort] = useState('newest');
+  const sorted = useMemo(() => sortNotes(notes, sort), [notes, sort]);
+  return (
+    <>
+      <select aria-label="Sort" value={sort} onChange={e => setSort(e.target.value)}>
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="title">Title A–Z</option>
+      </select>
+      <ul>{sorted.map(n => <li key={n.id}><Link to={`/notes/${n.id}`}>{n.title}</Link></li>)}</ul>
+    </>
+  );
+}
+```
+
+Three narrations still in place: slide-up + toast (Stage 5), autosuggest tags (Stage 4), route transitions (Stage 6).
 
 </details>
 
@@ -495,12 +541,15 @@ Output:
 <details>
 <summary>Example</summary>
 
-MSW arrives. New `tests/handlers.ts`:
+Stage 4's Build prompt added MSW and four handlers. The agent suggested using TanStack Query for fetch ergonomics; I declined for this iteration (vanilla `fetch` + `useEffect` is enough for now, and one less dependency to learn).
+
+`tests/handlers.ts` ended up as:
 
 ```ts
 import { http, HttpResponse } from 'msw'
 
 let notes = [{ id: '1', title: 'Welcome', content: '...', tags: ['intro'] }]
+const allTags = ['intro', 'todo', 'shopping', 'ideas']
 
 export const handlers = [
   http.get('/api/notes', () => HttpResponse.json(notes)),
@@ -515,20 +564,17 @@ export const handlers = [
   }),
   http.get('/api/tags', ({ request }) => {
     const q = new URL(request.url).searchParams.get('q') ?? ''
-    const all = ['intro', 'todo', 'shopping', 'ideas']
-    return HttpResponse.json(all.filter(t => t.startsWith(q)))
+    return HttpResponse.json(allTags.filter(t => t.startsWith(q)))
   }),
 ]
 ```
 
-`NotesList` now calls `fetch('/api/notes')` on mount; `NoteForm` posts on submit.
+Two narrations got replaced this stage:
 
-Narrations *replaced this stage*:
+- **Autosuggest tags** → debounced fetch to `/api/tags?q=…`, rendered as a `<ul role="listbox">` of options.
+- **Error toast on save failure** → a Playwright test overrides `POST /api/notes` to return 500 (`network.use(http.post(…))`), and the app's error path renders a visible error message.
 
-- **Autosuggest tags** → debounced fetch to `/api/tags?q=...`; results render in a `<ul role="listbox">`
-- **Error toast on save failure** → per-test override `network.use(http.post('/api/notes', () => new HttpResponse(null, { status: 500 })))` flips the app into an error path
-
-Narrations *still in place*: slide-up animation (Stage 5), route transitions (Stage 6).
+Slide-up animation (Stage 5) and route transitions (Stage 6) stay narrated.
 
 </details>
 
@@ -606,22 +652,24 @@ Output:
 <details>
 <summary>Example</summary>
 
-Tailwind utility classes go on every component. shadcn/ui replaces the bare HTML primitives:
+Stage 5's Build prompt swapped Stage 3's bare HTML primitives for shadcn/ui components and laid Tailwind utilities on top. The agent flagged one issue mid-swap: replacing the unstyled `<div role="dialog">` from Stage 3 with shadcn's `<Dialog>` *almost* dropped the `role="dialog"` attribute (different markup tree). It paused, asked me to confirm the Stage 3 test should keep finding the dialog by role, and emitted the swap with the role preserved.
 
-- `Button` for Submit, Cancel, Delete, Confirm
-- `Dialog` for the delete-confirm modal (replaces the unstyled `<div role="dialog">` from Stage 3)
-- `Input` and `Textarea` for the form fields
-- A `Sonner` `<Toaster />` mounted at the app root for save / error toasts
+Three narrations got replaced this stage:
 
-Narrations *replaced this stage*:
+- **Slide-up + green toast on save** → a CSS transition on `NoteDetail` mount, plus `toast.success('Note saved')` via Sonner.
+- **Hover state on note cards** → `hover:shadow-md hover:-translate-y-0.5` lifts the card and reveals a quick-actions menu.
+- **Focus indicators** → `focus-visible:ring-2 focus-visible:ring-accent` on every interactive element.
 
-- **Slide-up + green toast on save** → CSS transition on `NoteDetail` mount, plus `toast.success('Note saved')`
-- **Hover state on note cards** → Tailwind `hover:` utilities lift the card and reveal a quick-actions menu
-- **Focus indicators** → Tailwind `focus-visible:` ring on every interactive element
+One representative diff — the form's Submit button:
 
-Regression check: every `getByRole('button', { name: '…' })` and `getByLabel('Title')` from Stage 2–4 tests still resolves. shadcn's `Button` preserves the underlying `<button>` role; shadcn's `Dialog` keeps the `role="dialog"` that Stage 3's plain `<div>` already had.
+```diff
+- <button type="submit">Submit</button>
++ <Button type="submit">Submit</Button>
+```
 
-The app looks like an app now.
+shadcn's `<Button>` renders an underlying `<button>`, so `getByRole('button', { name: 'Submit' })` from the Stage 2 test still resolves. The regression-check pass found and fixed the one ARIA slip described above; the suite went green.
+
+The app reads as a real product now, not a sketch.
 
 </details>
 
@@ -703,30 +751,30 @@ Output:
 <details>
 <summary>Example</summary>
 
-Migrate to **React Router v7 (framework mode)** — assume that's what the chat agreed on; Next.js, TanStack Router, and Astro work the same way conceptually.
+The chat had already landed on **React Router v7 (framework mode)** as the framework. Next.js was the runner-up; I picked React Router because I wanted to keep deployment flexible (any static host or Node server).
 
-New route file structure:
+Stage 6's Build prompt migrated the components into file-based routes:
 
 ```
 app/
-  routes.ts                — route config
   root.tsx                 — layout shell
+  routes.ts                — route config
   routes/
     _index.tsx             — landing
     signup.tsx
     login.tsx
     notes._index.tsx       — list
-    notes.$id.tsx          — detail
+    notes.$id.tsx          — detail / edit
     notes.new.tsx          — create
 ```
 
-Narrations *replaced this stage*:
+Three narrations got replaced this stage:
 
-- **Route transition animation** → React Router's `<NavLink>` + a `view-transition` CSS hook
-- **Loading state on `/notes`** → the framework's `<Suspense>` boundary with a skeleton fallback while the route loader fetches notes
-- **Auth-gated `/notes`** → a `redirect('/login')` in the route loader when the session cookie is missing
+- **Loading state on `/notes`** → the route loader returns a Promise; `<Suspense>` shows a skeleton card list while it resolves.
+- **Auth-gated `/notes`** → the loader does `if (!session) throw redirect('/login')`; unauthenticated users land on the login screen.
+- **Optimistic save** → `useFetcher` renders the new note immediately and reconciles when the response lands.
 
-`tests/handlers.ts` is unchanged — every fetch still hits MSW. The Stage 2–5 e2e tests pass against the migrated app because the role/label locators didn't move.
+`tests/handlers.ts` is unchanged — every fetch still goes through MSW. The Stage 2–5 e2e tests pass against the migrated app because the role/label locators didn't move (the agent's first migration broke one — a wrapped `<form>` lost its accessible name; the regression check caught it and the fix was a one-liner).
 
 </details>
 
@@ -815,17 +863,32 @@ Output:
 <details>
 <summary>Example</summary>
 
-**Iteration 1 — `GET /api/notes`:**
+The chat had landed on **Hono + Drizzle + SQLite** as the backend stack — easy to run locally, easy to swap SQLite → Postgres later without touching Drizzle code.
 
-- Implement in **Hono + Drizzle + SQLite** (or whatever stack the chat picked): a `notes` table, a `notesRouter.get('/api/notes', ...)` returning `SELECT * FROM notes WHERE user_id = ?`.
-- Delete the `http.get('/api/notes', ...)` handler from `tests/handlers.ts`.
-- Re-run the e2e suite. Stages 2–6 tests still pass — they assert on UI, not on which side of the wire the data came from.
+**Iteration 1: `GET /api/notes`.** I pasted Stage 7's Build prompt; the agent picked GET as the first handler to migrate (lowest risk, sets up the schema + table + auth-context plumbing). It generated `server/db/schema.ts`, a migration, and the route:
 
-**Iteration 2 — `POST /api/notes`:** same dance.
+```ts
+// server/routes/notes.ts
+app.get('/api/notes', async c => {
+  const userId = c.get('userId')
+  const rows = await db.select().from(notes).where(eq(notes.userId, userId))
+  return c.json(rows)
+})
+```
 
-**Iteration 3 — auth (`POST /api/signup`, `POST /api/login`, session cookie):** same dance, in a single iteration since these three are coupled.
+Then the one-line deletion in `tests/handlers.ts`:
 
-By the end, `tests/handlers.ts` contains only handlers for third-party services (e.g., a hypothetical Slack webhook if the share-with-teammate flow uses one) — those mark the permanent system boundary, not the migration backlog.
+```diff
+- http.get('/api/notes', () => HttpResponse.json(notes)),
+```
+
+Stage 7's Add tests prompt ran the suite. Stages 2–6 e2e tests passed against the real route. No new test was needed (no narration was tied to GET).
+
+**Iteration 2: `POST /api/notes`.** Same dance. The agent caught one contract drift — the real route returned the saved note plus a server-set `createdAt` field that the MSW handler hadn't included; the frontend already rendered `note.createdAt` (it was already in the type, just often undefined), so no frontend change was needed. Suite passed.
+
+**Iteration 3: auth (`POST /api/signup`, `POST /api/login`, session cookie).** Coupled, so one iteration covered all three. The session-cookie change touched the route loaders from Stage 6; the suite caught one regression where the login redirect target was wrong, fixed in two lines.
+
+By the end of Stage 7, `tests/handlers.ts` contained only handlers for third-party services I don't own — those mark the permanent system boundary, not the migration backlog.
 
 </details>
 
