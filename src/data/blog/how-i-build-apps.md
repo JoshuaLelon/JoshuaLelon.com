@@ -44,13 +44,15 @@ Throughout this post we'll use a small **notes app** as a running example — si
 
 ## Why bother with a process
 
-Two things matter when you build with AI: taste (what you're building) and evals (knowing it works). Everything else is plumbing.
+Two things matter when you build with AI: **taste** (what you're building) and **evals** (knowing it works). Everything else is plumbing.
 
-The temptation is always to "ship first, test later," and "test later" ends up competing with other new priorities. 
+Most AI demos right now over-index on taste. A flashy 60-second video, a thread of screenshots, an agentic coding session that produces something impressive. Evals are conspicuously absent — at best a "vibe check" by the person who built it. That works fine for a toy. It falls apart fast.
 
-But the opposite temptation is just as bad: kitchen-sink the testing on day one, write twenty unit tests against scaffolding I'll throw away next week, and burn out before I've validated anything real.
+The problem isn't the absence of tests in general — it's that **there's no widely-shared playbook for incrementally adding tests as a prototype grows**. The advice you find online is either "write unit tests for everything" (which gets you twenty paperweights against scaffolding you'll throw away next week) or "skip tests until you ship" (which means by the time you have something to ship, you can't remember what it's supposed to do).
 
-I wanted a process where the tests grow with the product. Coarse at the start, granular when the shape stabilizes. Cheap enough at every stage that I don't have an excuse to skip them.
+The "what it's supposed to do" part is the real bite. Any app with more than three or four screens has enough surface area that you lose track. Even at the demo stage, you can't hold the whole flow in your head — what happens when a user clicks Delete with two items selected? Does the autosuggest list dismiss on Escape? Does the share-flow's empty state show the right message? Without something that pins those expectations down, every regression stays invisible until somebody happens to stumble through that exact path.
+
+I wanted a process where the tests grow with the product — coarse at the start, granular when the shape stabilizes, cheap enough at every stage that there's no excuse to skip them. That's what this pipeline is.
 
 ## Setup
 
