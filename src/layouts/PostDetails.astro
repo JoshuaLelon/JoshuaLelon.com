@@ -255,6 +255,7 @@ const nextPost =
       const isPromptDetails =
         summaryLabel.startsWith("Build prompt") ||
         summaryLabel.startsWith("Add tests prompt") ||
+        summaryLabel.startsWith("Setup prompt") ||
         summaryLabel === "Prompt";
 
       if (detailsAncestor && isPromptDetails) {

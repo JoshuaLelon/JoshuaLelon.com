@@ -31,6 +31,7 @@ Throughout this post we'll use a small **notes app** as a running example — si
 ## Contents
 
 - [Why bother with a process](#why-bother-with-a-process)
+- [Setup](#setup)
 - [The pipeline](#the-pipeline)
   - [Stage 1: Click-through prototype](#stage-1-click-through-prototype)
   - [Stage 2: Custom-input prototype](#stage-2-custom-input-prototype)
@@ -51,6 +52,57 @@ But the opposite temptation is just as bad: kitchen-sink the testing on day one,
 
 I wanted a process where the tests grow with the product. Coarse at the start, granular when the shape stabilizes. Cheap enough at every stage that I don't have an excuse to skip them.
 
+## Setup
+
+A one-time install before Stage 1. The seven stages all assume you have a project scaffolded with the locked-in tools (Playwright, MSW), the default runtime + bundler (React + Vite), the default styling stack (Tailwind), and an HTML parser for Stage 1's lint. Installing them up front means no friction later — every stage's commands just work.
+
+**Steps:**
+
+1. Make sure you have Node installed (any recent LTS).
+2. Paste the **Setup prompt**. The agent initializes the project, installs every dependency the pipeline will touch, downloads Playwright's browser binaries, and writes the minimal config files. No app code yet — that's Stage 1's job.
+
+<details>
+<summary>Setup prompt</summary>
+
+```
+You are setting up the project scaffold I'll use across all seven stages of the build pipeline. Defaults: React + Vite + Tailwind + shadcn-style components, Playwright + MSW for tests, an HTML parser for Stage 1's structural lint.
+
+Steps — do them in order:
+
+1. Initialize:
+   - npm init -y
+   - git init; write a sensible .gitignore for Node + Vite + Playwright (include at least: node_modules, dist, test-results, playwright-report, .env, .DS_Store).
+
+2. Install dependencies, latest stable versions:
+   - Locked-in test tools (devDependencies): @playwright/test, msw
+   - HTML parser for the Stage 1 lint (devDependencies): node-html-parser (or pick cheerio / linkedom — your call, just one)
+   - Default runtime + bundler: react, react-dom; @vitejs/plugin-react, vite (devDependencies)
+   - Default styling (devDependencies, only set up the configs — actual class usage starts at Stage 5): tailwindcss, postcss, autoprefixer
+   - TypeScript (devDependencies): typescript, @types/react, @types/react-dom, @types/node
+
+3. Download Playwright browser binaries:
+   - npx playwright install
+
+4. Scaffold minimal configs. Keep each file as small as possible — only what the pipeline needs:
+   - tsconfig.json — strict React + ESM settings
+   - vite.config.ts — wires @vitejs/plugin-react
+   - tailwind.config.js + postcss.config.js — empty content paths for now (Stage 5 will populate)
+   - playwright.config.ts — leave the webServer entry as a placeholder I'll fill in at Stage 2
+   - package.json scripts: dev (vite), build (vite build), test:e2e (playwright test), lint:wireframe (node tests/wireframe-lint.mjs — script file lands at Stage 1)
+   - Empty tests/ directory
+
+5. Do NOT scaffold any app code, HTML files, React components, routes, or test files yet. Setup is just the project shell — Stage 1 onward fills it in.
+
+If I plan to swap a default later (e.g. Svelte instead of React, or Pico.css instead of Tailwind), I'll uninstall and replace at the relevant stage. For now: assume the defaults.
+
+Output:
+- The project shell, ready for me to start Stage 1.
+- A short README.md naming each npm script and one-liner usage.
+- Tell me which HTML parser you picked and why.
+```
+
+</details>
+
 ## The pipeline
 
 ### Stage 1: Click-through prototype
@@ -61,10 +113,11 @@ I wanted a process where the tests grow with the product. Coarse at the start, g
 
 **Steps:**
 
-1. Tell the AI in chat about the app you want to build — what it does, who it's for, the main flows.
-2. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
-3. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
-4. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves.
+1. Make sure you've run the [Setup](#setup) prompt first — the rest of these steps assume the project scaffold is in place.
+2. Tell the AI in chat about the app you want to build — what it does, who it's for, the main flows.
+3. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
+4. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
+5. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves, every narration is tagged.
 
 <details>
 <summary>Build prompt</summary>
@@ -154,9 +207,8 @@ Tracked metrics — report but do not fail on:
 - Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
 
 Output:
-- tests/wireframe-lint.mjs (the script).
-- A package.json with one script entry: "lint:wireframe": "node tests/wireframe-lint.mjs".
-- Example run output showing the assertions passing and the narration count.
+- tests/wireframe-lint.mjs (the script). The `lint:wireframe` package.json script already exists from Setup.
+- Example run output showing the assertions passing and the narration counts per bucket.
 ```
 
 </details>
@@ -424,10 +476,11 @@ The four Stage 1 narrations stay in place — they all describe behavior beyond 
 ```
 You are refactoring a click-through HTML prototype into a React app with global-ish state. No styling, no network, no routing framework, no backend.
 
-You will introduce:
-- **React** as the runtime. (Swap: replace with Svelte, Vue, Solid, or another framework — if you do, the rest of the stack defaults shift accordingly.)
-- **React hooks** (`useState`, `useReducer`, `useContext`) for client state — built-in, no new dependency. (Swap: Zustand, Nano Stores, signals, or whatever fits.)
-- **A bundler** of your choice (default: Vite). Whatever it takes to serve the React app for the Playwright webServer in `playwright.config.ts`.
+React, React hooks, and Vite are already installed (from Setup) — don't reinstall them. This stage is the architectural introduction: refactor the wireframes into React components served by Vite.
+
+- **React** as the runtime. (To swap: uninstall react / react-dom / @vitejs/plugin-react and install Svelte / Vue / Solid plus the relevant Vite plugin — the rest of the stack defaults shift accordingly.)
+- **React hooks** (`useState`, `useReducer`, `useContext`) for client state — built-in. (Swap: Zustand, Nano Stores, signals.)
+- **Vite** is the bundler (from Setup). Wire the Playwright `webServer` entry in `playwright.config.ts` to spawn `npm run dev` so the e2e suite has something to talk to.
 
 Still OFF-LIMITS — strict:
 - No CSS, no Tailwind, no component library. Default browser rendering only.
@@ -547,6 +600,8 @@ Three narrations still in place: slide-up + toast (Stage 5), autosuggest tags (S
 ```
 You are adding a mocked-network layer (MSW) to a working React app with global state. No styling, no routing framework, no real backend.
 
+MSW is already installed (from Setup) — don't reinstall it.
+
 You will introduce:
 - **MSW** for mocking all network calls (locked in — do not swap). Default handlers go in `tests/handlers.ts` and are loaded by both the dev server and the Playwright test setup.
 - **`fetch` calls** (or a thin wrapper of your choice — TanStack Query, swr, or vanilla — pick one) at the points in the app that need "persisted" data or server interaction.
@@ -665,8 +720,10 @@ Slide-up animation (Stage 5) and route transitions (Stage 6) stay narrated.
 ```
 You are styling a working React app with mocked-network behaviors. The app's behavior is already complete; this stage is the visual layer.
 
+Tailwind is already installed and the config files are in place from Setup — start using utilities directly. shadcn/ui isn't installed yet; initialize it with `npx shadcn@latest init` and add components as you need them.
+
 You will introduce:
-- **Tailwind CSS** for utility-class styling. (Swap: vanilla CSS modules, Open Props, Pico.css, or another approach.)
+- **Tailwind CSS** for utility-class styling. (Swap: vanilla CSS modules, Open Props, Pico.css, or another approach — uninstall tailwindcss / postcss / autoprefixer first.)
 - **shadcn/ui** for component primitives (Button, Dialog, DropdownMenu, Toast, etc.). (Swap: another component library, or roll your own — but ensure the replacement preserves the ARIA roles emitted by the underlying HTML so the existing Playwright tests keep finding their locators.)
 
 Still OFF-LIMITS — strict:
