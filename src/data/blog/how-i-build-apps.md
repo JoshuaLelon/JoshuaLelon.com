@@ -37,20 +37,18 @@ I build apps in eight stages:
   - [Stage 6: Full prototype with mocked backend](#stage-6-full-prototype-with-mocked-backend)
   - [Stage 7: Backend slices](#stage-7-backend-slices)
   - [Stage 8: Sink toward integration and unit](#stage-8-sink-toward-integration-and-unit)
-- [Habits that keep me honest](#habits-that-keep-me-honest)
-- [The thing I want you to take from this](#the-thing-i-want-you-to-take-from-this)
 
 ## Why bother with a process
 
 Two things matter when you build with AI: taste (what you're building) and evals (knowing it works). Everything else is plumbing.
 
-The temptation is always to "ship first, test later," and later never comes. But the opposite temptation is just as bad: kitchen-sink the testing on day one, write twenty unit tests against scaffolding I'll throw away next week, and burn out before I've validated anything real.
+The temptation is always to "ship first, test later," and "test later" ends up competing with other new priorities. 
+
+But the opposite temptation is just as bad: kitchen-sink the testing on day one, write twenty unit tests against scaffolding I'll throw away next week, and burn out before I've validated anything real.
 
 I wanted a process where the tests grow with the product. Coarse at the start, granular when the shape stabilizes. Cheap enough at every stage that I don't have an excuse to skip them.
 
 ## The pipeline
-
-Stages 1–5 are the load-bearing part. They produce a tested, styled, fully-demoable prototype with mocked everything in hours, not days — the artifact you'd put in front of a real user before any backend exists. Stages 6–8 are the on-ramp from prototype to production: sketched with menu options rather than defaults, because the right choices there depend on what your app actually needs to do and where it'll live. The split into more stages than you might expect is deliberate — each stage is scope-locked to one architectural concern so the agent prompts can't drift, and so every change is small enough to validate with the e2e suite before the next one lands.
 
 ### Stage 1: Click-through prototype
 
@@ -671,19 +669,3 @@ Output:
 ```
 
 </details>
-
-## Habits that keep me honest
-
-- **Run the previous suite at every "Add tests" sub-stage.** Each test-adding prompt requires running the full test suite from earlier stages before the sub-stage is done. This is a property the pipeline aims for, not a guarantee — and "run the previous suite, treat failures as diagnostic, prefer fixing new code over changing old tests" is the discipline that turns it from a hope into a habit.
-- **No new flow merges without a Stage-1 e2e**, even when the screens are still HTML. The first test is the hard one to write. Once it exists, AI extends it mechanically.
-- **`tests/handlers.ts` is version-controlled from Stage 4 onward.** It's the inventory of "what does the backend owe the frontend." When I do Stage 7, I'm literally deleting from this file. It's a checklist that maintains itself. Handlers for third-party services I don't own — Slack, Stripe, SendGrid — never get deleted; they mark the permanent system boundary, not the migration backlog.
-- **Narrations are version-controlled, not comments.** Each `<aside class="narration">` is a spec waiting to be tested. I don't delete one without replacing it with implementation *and* a test that asserts what it described. The narration count goes down monotonically; I can see progress at a glance.
-- **One stage at a time, one prompt at a time.** I don't paste the Stage 5 prompt while the Stage 4 work is still landing. The constraints in each prompt are there to keep the agent from pulling in future-stage dependencies that haven't earned their place yet.
-- **No unit tests before Stage 8.** They encode an implementation that's still moving. Every refactor breaks them and I stop trusting them. Skip until the shape is stable.
-- **AI is best at Stages 1–5. I'm best at Stage 7.** Let it generate the wireframes and the first happy-path e2e — it's good at this; the locators are obvious from the markup. I write the route handlers and the persona/fixture setup, because that's where domain decisions live and where the trade-offs aren't legible without context.
-
-## The thing I want you to take from this
-
-The way tests typically get bolted on after the fact is downstream of one root cause: **most tests are coupled to implementation details that change.** If you decouple them — anchor everything to the two things that don't change (accessibility surface + network contracts) — the tests get cheap enough that there's no excuse to defer them. They become the spine of the build process, not a tax you pay at the end.
-
-Start coarse. Stay coarse until the product stops moving. Then, and only then, sink lower.
