@@ -299,7 +299,11 @@ const nextPost =
 
     async function copyCode(block, button) {
       const code = block.querySelector("code");
-      const text = code?.innerText;
+      // Use textContent rather than innerText — innerText is layout-aware and
+      // returns "" when the <pre> is inside a collapsed <details>, which is
+      // exactly the case for prompt collapsibles. textContent reads the DOM
+      // text regardless of rendering state.
+      const text = code?.textContent;
 
       await navigator.clipboard.writeText(text ?? "");
 
