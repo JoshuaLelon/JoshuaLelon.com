@@ -188,104 +188,106 @@ Output:
    </details>
 
 3. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ````
+   You are wireframing the web app we just discussed.
+
+   Cover the core flows: the primary value flow plus the supporting flows (sign-up / auth, settings, etc.) that the app needs. If a flow we haven't talked about yet should obviously exist, propose it inline and continue.
+
+   Constraints — strict:
+   - Only static .html files. One file per screen.
+   - <a href="..."> is the ONLY legal way to move between screens.
+   - NO JavaScript. NO frameworks. NO component libraries. NO build step. NO package.json. NO tests.
+   - Exactly ONE CSS file is allowed: narrations.css, holding only the color-coding rules for narration asides (see Narration tagging below). NO other CSS.
+   - Allowed HTML elements only (the "Wireframe HTML" subset):
+     - Scaffold: <!doctype html>, <html>, <head>, <title>, <body>
+     - Regions: <main>, <header>, <footer>, <nav>, <section>, <article>
+     - Headings: <h1>–<h6>
+     - Text & lists: <p>, <ul>, <ol>, <li>
+     - Tables: <table>, <thead>, <tbody>, <tr>, <th>, <td>
+     - Disclosure: <details>, <summary>
+     - Dialogs: <dialog open>
+     - Links: <a href>
+     - Forms: <form>, <fieldset>, <legend>, <label for>, <input> (types: text, email, password, number, tel, url, search, date, checkbox, radio, hidden, submit), <textarea>, <select>, <option>, <button>
+     - SVG diagrams: <svg> with <title> (required), <desc>, and shape children (<g>, <rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>, <path>, <text>). Use this for icons, arrows, status indicators, flow diagrams, simple charts.
+     - Narrations: <aside class="narration BUCKET">…</aside> where BUCKET is one of: state, network, style, framework, backend (see Narration tagging below).
+   - Any element NOT in this list is forbidden. If you need behavior requiring a forbidden element (<img>, <canvas>, <video>, <audio>, range/color/file inputs, anything needing <script>), insert an <aside class="narration BUCKET"> at that point describing in plain English what should happen, when, and why. Be specific enough that a future test could be written from the narration alone.
+   - For images specifically: if it needs real visual fidelity (logos, photos, screenshots), use a narration describing what it conveys. If it can be expressed as shapes (icons, arrows, status indicators, simple charts), use inline <svg> with a <title>.
+   - Use proper heading hierarchy. Use <label for="..."> on every form input. Every <svg> must have a <title>. Accessible names matter — they will become test locators in the next stage.
+
+   Narration tagging — strict:
+   - Every <aside class="narration"> must also carry exactly one bucket class indicating which future stage will replace it: state, network, style, framework, or backend.
+   - The aside must open with a <strong> whose visible text matches the bucket: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". This is the human-readable label (the colors come from narrations.css; the prefix is the accessibility fallback and the grep target).
+   - Bucket meanings:
+     - state — behaviors achievable with in-memory state alone (modals, dropdowns, sorting, filtering, list rendering from local state, tab switching, drag-and-drop within a page)
+     - network — behaviors that need a request/response round trip (autosuggest, server errors, optimistic UI, save-then-reload)
+     - style — visual fidelity (specific card layouts, animations, transitions, hover states, color schemes, focus indicators, spacing)
+     - framework — routing/loading concerns (route transitions, loading states tied to navigation, redirects, auth-gated routes, server-rendered initial state)
+     - backend — behaviors that need a real server (persistence across page reloads, real auth sessions, real-time server events, anything where the actual response shapes behavior)
+   - Link narrations.css from every .html file's <head>.
+
+   Output:
+   - A folder of .html files I can open directly in a browser.
+   - A short index.html with a list of all flows and entry points.
+   - narrations.css containing exactly these rules:
+
+   ```
+   aside.narration {
+     border-left: 4px solid var(--c);
+     background: var(--bg);
+     padding: 0.5em 0.75em;
+     margin: 1em 0;
+     font-style: italic;
+   }
+   aside.narration.state     { --c: #3b82f6; --bg: #eff6ff; }
+   aside.narration.network   { --c: #10b981; --bg: #ecfdf5; }
+   aside.narration.style     { --c: #8b5cf6; --bg: #f5f3ff; }
+   aside.narration.framework { --c: #f59e0b; --bg: #fffbeb; }
+   aside.narration.backend   { --c: #ef4444; --bg: #fef2f2; }
+   ```
+
+   - No other files.
+   ````
+
+   </details>
+
 4. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are writing a structural lint for a folder of static HTML wireframes.
+
+   Constraints — strict:
+   - Pure static analysis. NO browser, NO Playwright, NO server, NO running JavaScript from the wireframes.
+   - Use a single Node script: tests/wireframe-lint.mjs.
+   - Pick any HTML parser of your choice (e.g. node-html-parser, cheerio, linkedom).
+   - Exit code 0 on pass, non-zero on fail.
+
+   Assertions — must all pass:
+   1. For every <input> element across all .html files, there exists a <label> in the same file whose "for" attribute matches the input's id.
+   2. Every <svg> element has a <title> direct child with non-empty text.
+   3. Every .html file has exactly one <h1>. Heading levels within a file do not skip (i.e. no <h3> appears before any <h2> within the same document).
+   4. Every <a href="..."> pointing to a relative path resolves to an existing file in the wireframe folder.
+   5. Every <aside class="narration ..."> carries exactly one bucket class from {state, network, style, framework, backend} AND its first child is a <strong> whose text matches the bucket exactly: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". (Catches taxonomy drift early.)
+
+   Tracked metrics — report but do not fail on:
+   - Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
+
+   Delegate the script writing to a subagent so the parent chat doesn't carry the parser-specific implementation in context. Pass it: the five assertions above, the bucket-class + bold-prefix rule from Stage 1's Narrations spec, and your choice of HTML parser. The parent only verifies the script exits 0 against the current wireframe.
+
+   Output:
+   - tests/wireframe-lint.mjs (the script). The `lint:wireframe` package.json script already exists from Setup.
+   - Example run output showing the assertions passing and the narration counts per bucket.
+   ```
+
+   </details>
+
 5. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves, every narration is tagged.
-
-<details>
-<summary>Build prompt</summary>
-
-````
-You are wireframing the web app we just discussed.
-
-Cover the core flows: the primary value flow plus the supporting flows (sign-up / auth, settings, etc.) that the app needs. If a flow we haven't talked about yet should obviously exist, propose it inline and continue.
-
-Constraints — strict:
-- Only static .html files. One file per screen.
-- <a href="..."> is the ONLY legal way to move between screens.
-- NO JavaScript. NO frameworks. NO component libraries. NO build step. NO package.json. NO tests.
-- Exactly ONE CSS file is allowed: narrations.css, holding only the color-coding rules for narration asides (see Narration tagging below). NO other CSS.
-- Allowed HTML elements only (the "Wireframe HTML" subset):
-  - Scaffold: <!doctype html>, <html>, <head>, <title>, <body>
-  - Regions: <main>, <header>, <footer>, <nav>, <section>, <article>
-  - Headings: <h1>–<h6>
-  - Text & lists: <p>, <ul>, <ol>, <li>
-  - Tables: <table>, <thead>, <tbody>, <tr>, <th>, <td>
-  - Disclosure: <details>, <summary>
-  - Dialogs: <dialog open>
-  - Links: <a href>
-  - Forms: <form>, <fieldset>, <legend>, <label for>, <input> (types: text, email, password, number, tel, url, search, date, checkbox, radio, hidden, submit), <textarea>, <select>, <option>, <button>
-  - SVG diagrams: <svg> with <title> (required), <desc>, and shape children (<g>, <rect>, <circle>, <ellipse>, <line>, <polyline>, <polygon>, <path>, <text>). Use this for icons, arrows, status indicators, flow diagrams, simple charts.
-  - Narrations: <aside class="narration BUCKET">…</aside> where BUCKET is one of: state, network, style, framework, backend (see Narration tagging below).
-- Any element NOT in this list is forbidden. If you need behavior requiring a forbidden element (<img>, <canvas>, <video>, <audio>, range/color/file inputs, anything needing <script>), insert an <aside class="narration BUCKET"> at that point describing in plain English what should happen, when, and why. Be specific enough that a future test could be written from the narration alone.
-- For images specifically: if it needs real visual fidelity (logos, photos, screenshots), use a narration describing what it conveys. If it can be expressed as shapes (icons, arrows, status indicators, simple charts), use inline <svg> with a <title>.
-- Use proper heading hierarchy. Use <label for="..."> on every form input. Every <svg> must have a <title>. Accessible names matter — they will become test locators in the next stage.
-
-Narration tagging — strict:
-- Every <aside class="narration"> must also carry exactly one bucket class indicating which future stage will replace it: state, network, style, framework, or backend.
-- The aside must open with a <strong> whose visible text matches the bucket: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". This is the human-readable label (the colors come from narrations.css; the prefix is the accessibility fallback and the grep target).
-- Bucket meanings:
-  - state — behaviors achievable with in-memory state alone (modals, dropdowns, sorting, filtering, list rendering from local state, tab switching, drag-and-drop within a page)
-  - network — behaviors that need a request/response round trip (autosuggest, server errors, optimistic UI, save-then-reload)
-  - style — visual fidelity (specific card layouts, animations, transitions, hover states, color schemes, focus indicators, spacing)
-  - framework — routing/loading concerns (route transitions, loading states tied to navigation, redirects, auth-gated routes, server-rendered initial state)
-  - backend — behaviors that need a real server (persistence across page reloads, real auth sessions, real-time server events, anything where the actual response shapes behavior)
-- Link narrations.css from every .html file's <head>.
-
-Output:
-- A folder of .html files I can open directly in a browser.
-- A short index.html with a list of all flows and entry points.
-- narrations.css containing exactly these rules:
-
-```
-aside.narration {
-  border-left: 4px solid var(--c);
-  background: var(--bg);
-  padding: 0.5em 0.75em;
-  margin: 1em 0;
-  font-style: italic;
-}
-aside.narration.state     { --c: #3b82f6; --bg: #eff6ff; }
-aside.narration.network   { --c: #10b981; --bg: #ecfdf5; }
-aside.narration.style     { --c: #8b5cf6; --bg: #f5f3ff; }
-aside.narration.framework { --c: #f59e0b; --bg: #fffbeb; }
-aside.narration.backend   { --c: #ef4444; --bg: #fef2f2; }
-```
-
-- No other files.
-````
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are writing a structural lint for a folder of static HTML wireframes.
-
-Constraints — strict:
-- Pure static analysis. NO browser, NO Playwright, NO server, NO running JavaScript from the wireframes.
-- Use a single Node script: tests/wireframe-lint.mjs.
-- Pick any HTML parser of your choice (e.g. node-html-parser, cheerio, linkedom).
-- Exit code 0 on pass, non-zero on fail.
-
-Assertions — must all pass:
-1. For every <input> element across all .html files, there exists a <label> in the same file whose "for" attribute matches the input's id.
-2. Every <svg> element has a <title> direct child with non-empty text.
-3. Every .html file has exactly one <h1>. Heading levels within a file do not skip (i.e. no <h3> appears before any <h2> within the same document).
-4. Every <a href="..."> pointing to a relative path resolves to an existing file in the wireframe folder.
-5. Every <aside class="narration ..."> carries exactly one bucket class from {state, network, style, framework, backend} AND its first child is a <strong> whose text matches the bucket exactly: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". (Catches taxonomy drift early.)
-
-Tracked metrics — report but do not fail on:
-- Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
-
-Delegate the script writing to a subagent so the parent chat doesn't carry the parser-specific implementation in context. Pass it: the five assertions above, the bucket-class + bold-prefix rule from Stage 1's Narrations spec, and your choice of HTML parser. The parent only verifies the script exits 0 against the current wireframe.
-
-Output:
-- tests/wireframe-lint.mjs (the script). The `lint:wireframe` package.json script already exists from Setup.
-- Example run output showing the assertions passing and the narration counts per bucket.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
@@ -402,59 +404,61 @@ Four narrations end up authored across the screens, color-coded by bucket: `Styl
 **Steps:**
 
 1. Paste the **Build prompt**. The agent adds inline `<script>` to each form so typed values flow to the next screen.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ```
+   You are extending an HTML wireframe with the minimum behavior to make form-submit flows navigable.
+
+   For each flow in this folder:
+   - Add inline <script> tags inside the existing .html files that capture form submissions with event.preventDefault() and render the next screen with typed values visible (e.g., a typed Title appears as the <h1> on the next screen).
+   - Use plain DOM APIs only — no fetch, no libraries.
+
+   Constraints — strict:
+   - Do NOT introduce any framework, component library, bundler, CSS, or styling.
+   - Do NOT add data-testid or any other attribute purely for testing. Behavior must be observable through semantic HTML alone (headings, labels, button names).
+   - Do NOT touch <aside class="narration"> blocks. Leave them as-is.
+   - Do NOT add npm dependencies to the app itself. Any tooling installed (e.g. for serving the files) is dev-only.
+
+   Output:
+   - Updated .html files with inline <script> blocks.
+   - A short description of what each flow now does end-to-end.
+   ```
+
+   </details>
+
 2. Paste the **Add tests prompt**. The agent writes one Playwright e2e per flow at `tests/e2e/`.
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are writing the first Playwright e2e tests against a click-through HTML prototype.
+
+   For each flow, write ONE Playwright test at tests/e2e/[flow-name].test.ts. The test must:
+   - Use ONLY page.getByRole() and page.getByLabel() locators. No CSS selectors, no test IDs, no XPath.
+   - Walk every screen in the flow from entry to completion.
+   - Assert the user-facing outcome (a heading, visible text the user typed, a navigation result).
+
+   Constraints — strict:
+   - Do NOT modify the wireframes or add JS to make tests pass. Tests must pass against the existing HTML + inline JS.
+   - Do NOT add test IDs or data-attributes to the HTML.
+   - Do NOT install any state-management or UI library — Playwright is the only new dependency.
+
+   Before this sub-stage is done, run the existing structural lint (`npm run lint:wireframe`). It must still pass. If it doesn't, fix the wireframe — do not weaken the lint.
+
+   Spawn one subagent per flow to write that flow's test file. Pass each subagent only: (1) the screens involved in its flow and the accessible names on them (button labels, form labels, headings), (2) the role/label-locator rule (no CSS selectors, no test IDs, no XPath). The parent doesn't need the test bodies in its context. Wait for all subagents to finish, then run `npx playwright test` to verify each test exists and passes.
+
+   Output:
+   - A playwright.config.ts with a webServer entry that serves the static files locally.
+   - One test file per flow under tests/e2e/.
+   - All tests pass when I run `npx playwright test`. Existing structural lint still passes.
+   ```
+
+   </details>
+
 3. Run `npx playwright test` — every flow's happy path passes; the structural lint from Stage 1 stays green.
-
-<details>
-<summary>Build prompt</summary>
-
-```
-You are extending an HTML wireframe with the minimum behavior to make form-submit flows navigable.
-
-For each flow in this folder:
-- Add inline <script> tags inside the existing .html files that capture form submissions with event.preventDefault() and render the next screen with typed values visible (e.g., a typed Title appears as the <h1> on the next screen).
-- Use plain DOM APIs only — no fetch, no libraries.
-
-Constraints — strict:
-- Do NOT introduce any framework, component library, bundler, CSS, or styling.
-- Do NOT add data-testid or any other attribute purely for testing. Behavior must be observable through semantic HTML alone (headings, labels, button names).
-- Do NOT touch <aside class="narration"> blocks. Leave them as-is.
-- Do NOT add npm dependencies to the app itself. Any tooling installed (e.g. for serving the files) is dev-only.
-
-Output:
-- Updated .html files with inline <script> blocks.
-- A short description of what each flow now does end-to-end.
-```
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are writing the first Playwright e2e tests against a click-through HTML prototype.
-
-For each flow, write ONE Playwright test at tests/e2e/[flow-name].test.ts. The test must:
-- Use ONLY page.getByRole() and page.getByLabel() locators. No CSS selectors, no test IDs, no XPath.
-- Walk every screen in the flow from entry to completion.
-- Assert the user-facing outcome (a heading, visible text the user typed, a navigation result).
-
-Constraints — strict:
-- Do NOT modify the wireframes or add JS to make tests pass. Tests must pass against the existing HTML + inline JS.
-- Do NOT add test IDs or data-attributes to the HTML.
-- Do NOT install any state-management or UI library — Playwright is the only new dependency.
-
-Before this sub-stage is done, run the existing structural lint (`npm run lint:wireframe`). It must still pass. If it doesn't, fix the wireframe — do not weaken the lint.
-
-Spawn one subagent per flow to write that flow's test file. Pass each subagent only: (1) the screens involved in its flow and the accessible names on them (button labels, form labels, headings), (2) the role/label-locator rule (no CSS selectors, no test IDs, no XPath). The parent doesn't need the test bodies in its context. Wait for all subagents to finish, then run `npx playwright test` to verify each test exists and passes.
-
-Output:
-- A playwright.config.ts with a webServer entry that serves the static files locally.
-- One test file per flow under tests/e2e/.
-- All tests pass when I run `npx playwright test`. Existing structural lint still passes.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
@@ -543,67 +547,69 @@ The four Stage 1 narrations stay in place — they all describe behavior beyond 
 **Steps:**
 
 1. Paste the **Build prompt**. The agent refactors the wireframes into React components with hooks for state, and replaces any state-only narrations.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ```
+   You are refactoring a click-through HTML prototype into a React app with global-ish state. No styling, no network, no routing framework, no backend.
+
+   React, React hooks, and Vite are already installed (from Setup) — don't reinstall them. This stage is the architectural introduction: refactor the wireframes into React components served by Vite.
+
+   - **React** as the runtime. (To swap: uninstall react / react-dom / @vitejs/plugin-react and install Svelte / Vue / Solid plus the relevant Vite plugin — the rest of the stack defaults shift accordingly.)
+   - **React hooks** (`useState`, `useReducer`, `useContext`) for client state — built-in. (Swap: Zustand, Nano Stores, signals.)
+   - **Vite** is the bundler (from Setup). Wire the Playwright `webServer` entry in `playwright.config.ts` to spawn `npm run dev` so the e2e suite has something to talk to.
+
+   Still OFF-LIMITS — strict:
+   - No CSS, no Tailwind, no component library. Default browser rendering only.
+   - No `fetch`, no MSW, no network calls of any kind.
+   - No routing framework. Single-page app or per-screen entry points served by the bundler; navigation via `<a href>` or framework-free `history.pushState`.
+   - No real backend, no real database, no auth provider.
+
+   For every narration tagged with the `state` class (i.e. every `<aside class="narration state">` opening with `<strong>State-only —</strong>`):
+   - REPLACE the narration with the real implementation in React + in-memory state.
+   - Do NOT write tests for it in this sub-stage — that comes next.
+
+   Leave every other narration in place — they belong to later stages (`network`, `style`, `framework`, `backend`).
+
+   Once the user and you have agreed on the component tree (App, Provider / Context, per-screen components), spawn one subagent per screen to refactor that screen's `.html` file into a React component plus any helpers it needs. Pass each subagent: (1) the screen's current HTML, (2) the agreed component name and shape, (3) the state slice it reads/writes, (4) the narrations on that screen with their bucket prefixes (so it knows which to replace and which to leave). The parent doesn't need every component's source in context. Wait for all subagents to finish, then assemble them in App and verify the app boots.
+
+   Output:
+   - The React app.
+   - A list of the replaced state narrations with the verbatim text of each (this list drives the next sub-stage's tests).
+   - A list of remaining narrations grouped by bucket class.
+   ```
+
+   </details>
+
 2. Paste the **Add tests prompt**. The agent writes a Playwright e2e for each replaced narration.
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are writing Playwright e2e tests for state-only behaviors that were just implemented from narrations in a React app.
+
+   You will receive a list of <aside class="narration"> blocks that were replaced with implementation, including the verbatim text of each one. For each one:
+   - Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior.
+   - Use ONLY page.getByRole() and page.getByLabel() locators. No CSS selectors, no test IDs.
+   - Tests assert in-app state transitions (a modal opening when a button is clicked, a filtered list updating when a search input changes, etc.).
+
+   Before this sub-stage is done, run the full test suite from all previous stages (structural lint + Stage 2 e2e tests). The expectation is that they pass unchanged. If a previous test fails:
+   1. First check: did this stage's new code change an accessible name, a heading, a label, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
+   2. If the failure reflects a deliberate product change (a button renamed on purpose, a flow restructured), update the test in its own commit with a message that names the product change.
+   3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+   Spawn one subagent per replaced state-only narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the React component(s) that implement the behavior, (3) the role/label-locator rule. Trivially parallel — wait for all subagents to finish, then run the full suite.
+
+   Output:
+   - One new test file per replaced narration, under tests/e2e/.
+   - Test run output showing: structural lint passing, Stage 2 e2e passing, all new tests passing.
+   ```
+
+   </details>
+
 3. Run the full suite — structural lint + Stage 2 e2e + the new tests all pass.
-
-<details>
-<summary>Build prompt</summary>
-
-```
-You are refactoring a click-through HTML prototype into a React app with global-ish state. No styling, no network, no routing framework, no backend.
-
-React, React hooks, and Vite are already installed (from Setup) — don't reinstall them. This stage is the architectural introduction: refactor the wireframes into React components served by Vite.
-
-- **React** as the runtime. (To swap: uninstall react / react-dom / @vitejs/plugin-react and install Svelte / Vue / Solid plus the relevant Vite plugin — the rest of the stack defaults shift accordingly.)
-- **React hooks** (`useState`, `useReducer`, `useContext`) for client state — built-in. (Swap: Zustand, Nano Stores, signals.)
-- **Vite** is the bundler (from Setup). Wire the Playwright `webServer` entry in `playwright.config.ts` to spawn `npm run dev` so the e2e suite has something to talk to.
-
-Still OFF-LIMITS — strict:
-- No CSS, no Tailwind, no component library. Default browser rendering only.
-- No `fetch`, no MSW, no network calls of any kind.
-- No routing framework. Single-page app or per-screen entry points served by the bundler; navigation via `<a href>` or framework-free `history.pushState`.
-- No real backend, no real database, no auth provider.
-
-For every narration tagged with the `state` class (i.e. every `<aside class="narration state">` opening with `<strong>State-only —</strong>`):
-- REPLACE the narration with the real implementation in React + in-memory state.
-- Do NOT write tests for it in this sub-stage — that comes next.
-
-Leave every other narration in place — they belong to later stages (`network`, `style`, `framework`, `backend`).
-
-Once the user and you have agreed on the component tree (App, Provider / Context, per-screen components), spawn one subagent per screen to refactor that screen's `.html` file into a React component plus any helpers it needs. Pass each subagent: (1) the screen's current HTML, (2) the agreed component name and shape, (3) the state slice it reads/writes, (4) the narrations on that screen with their bucket prefixes (so it knows which to replace and which to leave). The parent doesn't need every component's source in context. Wait for all subagents to finish, then assemble them in App and verify the app boots.
-
-Output:
-- The React app.
-- A list of the replaced state narrations with the verbatim text of each (this list drives the next sub-stage's tests).
-- A list of remaining narrations grouped by bucket class.
-```
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are writing Playwright e2e tests for state-only behaviors that were just implemented from narrations in a React app.
-
-You will receive a list of <aside class="narration"> blocks that were replaced with implementation, including the verbatim text of each one. For each one:
-- Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior.
-- Use ONLY page.getByRole() and page.getByLabel() locators. No CSS selectors, no test IDs.
-- Tests assert in-app state transitions (a modal opening when a button is clicked, a filtered list updating when a search input changes, etc.).
-
-Before this sub-stage is done, run the full test suite from all previous stages (structural lint + Stage 2 e2e tests). The expectation is that they pass unchanged. If a previous test fails:
-1. First check: did this stage's new code change an accessible name, a heading, a label, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
-2. If the failure reflects a deliberate product change (a button renamed on purpose, a flow restructured), update the test in its own commit with a message that names the product change.
-3. Do NOT silently disable, skip, weaken, or comment out a previous test.
-
-Spawn one subagent per replaced state-only narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the React component(s) that implement the behavior, (3) the role/label-locator rule. Trivially parallel — wait for all subagents to finish, then run the full suite.
-
-Output:
-- One new test file per replaced narration, under tests/e2e/.
-- Test run output showing: structural lint passing, Stage 2 e2e passing, all new tests passing.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
@@ -671,67 +677,69 @@ Three narrations still in place: slide-up + toast (Stage 5), autosuggest tags (S
 **Steps:**
 
 1. Paste the **Build prompt**. The agent adds MSW, wires `fetch` calls in the app, and replaces network-dependent narrations.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ```
+   You are adding a mocked-network layer (MSW) to a working React app with global state. No styling, no routing framework, no real backend.
+
+   MSW is already installed (from Setup) — don't reinstall it.
+
+   You will introduce:
+   - **MSW** for mocking all network calls (locked in — do not swap). Default handlers go in `tests/handlers.ts` and are loaded by both the dev server and the Playwright test setup.
+   - **`fetch` calls** (or a thin wrapper of your choice — TanStack Query, swr, or vanilla — pick one) at the points in the app that need "persisted" data or server interaction.
+
+   Still OFF-LIMITS — strict:
+   - No CSS, no Tailwind, no component library. Default browser rendering only.
+   - No routing framework.
+   - No real backend, no real database, no auth provider.
+
+   For every narration tagged with the `network` class (i.e. every `<aside class="narration network">` opening with `<strong>Network —</strong>`):
+   - REPLACE the narration with the real implementation using `fetch` + an MSW handler.
+   - Do NOT write tests for it in this sub-stage — that comes next.
+
+   Leave every other narration in place — they belong to later stages (`style`, `framework`, `backend`).
+
+   Once you've enumerated the network calls the app needs (each network narration plus any fetch sites already in use), spawn one subagent per endpoint to write both its MSW handler (in `tests/handlers.ts`) and the matching `fetch` call at the relevant component. Pass each subagent: (1) the endpoint URL + method + request/response shape, (2) the component that calls it, (3) the narration it replaces (with its `<strong>Network —</strong>` prefix). Wait for all subagents to finish, then have the parent concatenate the handlers into `tests/handlers.ts`.
+
+   Output:
+   - The updated React app with `fetch` calls and an MSW setup.
+   - `tests/handlers.ts` with mock handlers for every network call the app makes.
+   - A list of the replaced network narrations with verbatim text (this list drives the next sub-stage's tests).
+   - A list of remaining narrations grouped by bucket class.
+   ```
+
+   </details>
+
 2. Paste the **Add tests prompt**. The agent writes Playwright tests using `network.use(...)` for per-test scenarios (empty list, error response, populated suggestions).
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are writing Playwright e2e tests for network-dependent behaviors that were just implemented from narrations.
+
+   For each replaced narration:
+   - Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior.
+   - Use ONLY page.getByRole() and page.getByLabel() locators. No CSS selectors, no test IDs.
+   - Use the test-scoped network override (e.g. `network.use(http.get(...))`) to set up the specific scenario the test needs: empty list, error response, populated suggestions, slow response, etc.
+
+   Before this sub-stage is done, run the full test suite from all previous stages (structural lint + Stage 2 e2e + Stage 3 e2e). The expectation is that they pass unchanged. If a previous test fails:
+   1. First check: did this stage's new code change an accessible name, a heading, a label, an MSW handler shape, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
+   2. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the product change.
+   3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+   Spawn one subagent per replaced network narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the relevant `network.use(http.METHOD(...))` override pattern for the scenario this test needs (empty list, error response, populated suggestions, slow response), (3) the role/label-locator rule. The parent never sees the test bodies. Wait for all subagents to finish, then run the full suite.
+
+   Output:
+   - One new test file per replaced narration, under tests/e2e/.
+   - Test run output showing: structural lint passing, Stage 2 + Stage 3 e2e passing, all new tests passing.
+   ```
+
+   </details>
+
 3. Run the full suite — Stages 2–3 e2e + the new tests all pass; structural lint stays green.
-
-<details>
-<summary>Build prompt</summary>
-
-```
-You are adding a mocked-network layer (MSW) to a working React app with global state. No styling, no routing framework, no real backend.
-
-MSW is already installed (from Setup) — don't reinstall it.
-
-You will introduce:
-- **MSW** for mocking all network calls (locked in — do not swap). Default handlers go in `tests/handlers.ts` and are loaded by both the dev server and the Playwright test setup.
-- **`fetch` calls** (or a thin wrapper of your choice — TanStack Query, swr, or vanilla — pick one) at the points in the app that need "persisted" data or server interaction.
-
-Still OFF-LIMITS — strict:
-- No CSS, no Tailwind, no component library. Default browser rendering only.
-- No routing framework.
-- No real backend, no real database, no auth provider.
-
-For every narration tagged with the `network` class (i.e. every `<aside class="narration network">` opening with `<strong>Network —</strong>`):
-- REPLACE the narration with the real implementation using `fetch` + an MSW handler.
-- Do NOT write tests for it in this sub-stage — that comes next.
-
-Leave every other narration in place — they belong to later stages (`style`, `framework`, `backend`).
-
-Once you've enumerated the network calls the app needs (each network narration plus any fetch sites already in use), spawn one subagent per endpoint to write both its MSW handler (in `tests/handlers.ts`) and the matching `fetch` call at the relevant component. Pass each subagent: (1) the endpoint URL + method + request/response shape, (2) the component that calls it, (3) the narration it replaces (with its `<strong>Network —</strong>` prefix). Wait for all subagents to finish, then have the parent concatenate the handlers into `tests/handlers.ts`.
-
-Output:
-- The updated React app with `fetch` calls and an MSW setup.
-- `tests/handlers.ts` with mock handlers for every network call the app makes.
-- A list of the replaced network narrations with verbatim text (this list drives the next sub-stage's tests).
-- A list of remaining narrations grouped by bucket class.
-```
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are writing Playwright e2e tests for network-dependent behaviors that were just implemented from narrations.
-
-For each replaced narration:
-- Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior.
-- Use ONLY page.getByRole() and page.getByLabel() locators. No CSS selectors, no test IDs.
-- Use the test-scoped network override (e.g. `network.use(http.get(...))`) to set up the specific scenario the test needs: empty list, error response, populated suggestions, slow response, etc.
-
-Before this sub-stage is done, run the full test suite from all previous stages (structural lint + Stage 2 e2e + Stage 3 e2e). The expectation is that they pass unchanged. If a previous test fails:
-1. First check: did this stage's new code change an accessible name, a heading, a label, an MSW handler shape, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
-2. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the product change.
-3. Do NOT silently disable, skip, weaken, or comment out a previous test.
-
-Spawn one subagent per replaced network narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the relevant `network.use(http.METHOD(...))` override pattern for the scenario this test needs (empty list, error response, populated suggestions, slow response), (3) the role/label-locator rule. The parent never sees the test bodies. Wait for all subagents to finish, then run the full suite.
-
-Output:
-- One new test file per replaced narration, under tests/e2e/.
-- Test run output showing: structural lint passing, Stage 2 + Stage 3 e2e passing, all new tests passing.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
@@ -795,65 +803,67 @@ Slide-up animation (Stage 5) and route transitions (Stage 6) stay narrated.
 **Steps:**
 
 1. Paste the **Build prompt**. The agent adopts Tailwind + shadcn/ui across the components, replaces style-only narrations, and preserves accessible names.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ```
+   You are styling a working React app with mocked-network behaviors. The app's behavior is already complete; this stage is the visual layer.
+
+   Tailwind is already installed and the config files are in place from Setup — start using utilities directly. shadcn/ui isn't installed yet; initialize it with `npx shadcn@latest init` and add components as you need them.
+
+   You will introduce:
+   - **Tailwind CSS** for utility-class styling. (Swap: vanilla CSS modules, Open Props, Pico.css, or another approach — uninstall tailwindcss / postcss / autoprefixer first.)
+   - **shadcn/ui** for component primitives (Button, Dialog, DropdownMenu, Toast, etc.). (Swap: another component library, or roll your own — but ensure the replacement preserves the ARIA roles emitted by the underlying HTML so the existing Playwright tests keep finding their locators.)
+
+   Still OFF-LIMITS — strict:
+   - No routing framework.
+   - No real backend, no real database, no auth provider.
+
+   For every narration tagged with the `style` class (i.e. every `<aside class="narration style">` opening with `<strong>Style —</strong>`):
+   - REPLACE the narration with the real implementation using Tailwind + shadcn/ui (or your chosen styling stack).
+
+   Leave every other narration in place — they belong to later stages (`framework`, `backend`).
+
+   After running `npx shadcn@latest init` and picking a base theme, spawn one subagent per React component file to apply Tailwind classes and swap in shadcn primitives. Pass each subagent: (1) the component's current source, (2) the role-preservation constraint (every locator from Stages 2–4 must still resolve), (3) any `style`-class narrations inside that component (with their `<strong>Style —</strong>` prefixes). Components style mostly independently — wait for all subagents to finish, then run the full suite to confirm role/label locators survived.
+
+   Critical constraint: **preserve accessible names**. Every `<button>` named "Submit" must remain findable as `getByRole('button', { name: 'Submit' })` after styling. If shadcn/ui's wrapper components change the underlying role (rare but possible), adjust the wrapping so accessibility roles are preserved. Do NOT add test IDs to compensate; fix the markup.
+
+   Once the style narrations are gone, the `narrations.css` color-coding file is no longer needed; you may remove it (or leave it — the remaining `framework` and `backend` asides still color-code cleanly).
+
+   Output:
+   - The styled app.
+   - A list of the replaced style narrations with verbatim text — flagged by whether each is independently testable (animations triggered by user action: yes; static color schemes: no, just visual). This list drives the next sub-stage's tests.
+   - A list of remaining narrations grouped by bucket class (these should all be `framework` or `backend` at this point).
+   ```
+
+   </details>
+
 2. Paste the **Add tests prompt**. Mostly a regression check — confirm every role/label locator from Stages 2–4 still resolves. Add new tests only for style behaviors that are independently testable.
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are running the regression check after a styling pass, and writing targeted tests for any style-only narrations whose behavior is testable.
+
+   First and most important: run the full test suite from all previous stages (structural lint + Stage 2 e2e + Stage 3 e2e + Stage 4 e2e). The expectation is that they pass unchanged. If a previous test fails:
+   1. First check: did the styling pass wrap a component in a way that changed its accessible role, or did a class swap drop a `<button>` for a `<div onclick>`? Fix the styled code so the previous test passes again. Do NOT change the test.
+   2. Do NOT add test IDs to compensate for broken role detection — the failure is a signal that the markup is wrong, and adding a test ID hides the bug instead of fixing it.
+   3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+   For each style-only narration whose behavior is independently testable (animations triggered by user action, hover states with content changes, focus indicators, `prefers-reduced-motion` paths):
+   - Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts asserting the described behavior.
+   - Use ONLY page.getByRole() and page.getByLabel() locators.
+
+   Output:
+   - (Possibly empty) test files for testable style-only narrations.
+   - Test run output showing: structural lint passing, Stages 2–4 e2e passing, any new tests passing.
+   ```
+
+   </details>
+
 3. Run the full suite. Any failure is almost always a wrapped element that lost its role; fix the markup, not the test.
-
-<details>
-<summary>Build prompt</summary>
-
-```
-You are styling a working React app with mocked-network behaviors. The app's behavior is already complete; this stage is the visual layer.
-
-Tailwind is already installed and the config files are in place from Setup — start using utilities directly. shadcn/ui isn't installed yet; initialize it with `npx shadcn@latest init` and add components as you need them.
-
-You will introduce:
-- **Tailwind CSS** for utility-class styling. (Swap: vanilla CSS modules, Open Props, Pico.css, or another approach — uninstall tailwindcss / postcss / autoprefixer first.)
-- **shadcn/ui** for component primitives (Button, Dialog, DropdownMenu, Toast, etc.). (Swap: another component library, or roll your own — but ensure the replacement preserves the ARIA roles emitted by the underlying HTML so the existing Playwright tests keep finding their locators.)
-
-Still OFF-LIMITS — strict:
-- No routing framework.
-- No real backend, no real database, no auth provider.
-
-For every narration tagged with the `style` class (i.e. every `<aside class="narration style">` opening with `<strong>Style —</strong>`):
-- REPLACE the narration with the real implementation using Tailwind + shadcn/ui (or your chosen styling stack).
-
-Leave every other narration in place — they belong to later stages (`framework`, `backend`).
-
-After running `npx shadcn@latest init` and picking a base theme, spawn one subagent per React component file to apply Tailwind classes and swap in shadcn primitives. Pass each subagent: (1) the component's current source, (2) the role-preservation constraint (every locator from Stages 2–4 must still resolve), (3) any `style`-class narrations inside that component (with their `<strong>Style —</strong>` prefixes). Components style mostly independently — wait for all subagents to finish, then run the full suite to confirm role/label locators survived.
-
-Critical constraint: **preserve accessible names**. Every `<button>` named "Submit" must remain findable as `getByRole('button', { name: 'Submit' })` after styling. If shadcn/ui's wrapper components change the underlying role (rare but possible), adjust the wrapping so accessibility roles are preserved. Do NOT add test IDs to compensate; fix the markup.
-
-Once the style narrations are gone, the `narrations.css` color-coding file is no longer needed; you may remove it (or leave it — the remaining `framework` and `backend` asides still color-code cleanly).
-
-Output:
-- The styled app.
-- A list of the replaced style narrations with verbatim text — flagged by whether each is independently testable (animations triggered by user action: yes; static color schemes: no, just visual). This list drives the next sub-stage's tests.
-- A list of remaining narrations grouped by bucket class (these should all be `framework` or `backend` at this point).
-```
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are running the regression check after a styling pass, and writing targeted tests for any style-only narrations whose behavior is testable.
-
-First and most important: run the full test suite from all previous stages (structural lint + Stage 2 e2e + Stage 3 e2e + Stage 4 e2e). The expectation is that they pass unchanged. If a previous test fails:
-1. First check: did the styling pass wrap a component in a way that changed its accessible role, or did a class swap drop a `<button>` for a `<div onclick>`? Fix the styled code so the previous test passes again. Do NOT change the test.
-2. Do NOT add test IDs to compensate for broken role detection — the failure is a signal that the markup is wrong, and adding a test ID hides the bug instead of fixing it.
-3. Do NOT silently disable, skip, weaken, or comment out a previous test.
-
-For each style-only narration whose behavior is independently testable (animations triggered by user action, hover states with content changes, focus indicators, `prefers-reduced-motion` paths):
-- Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts asserting the described behavior.
-- Use ONLY page.getByRole() and page.getByLabel() locators.
-
-Output:
-- (Possibly empty) test files for testable style-only narrations.
-- Test run output showing: structural lint passing, Stages 2–4 e2e passing, any new tests passing.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
@@ -902,68 +912,70 @@ The app reads as a real product now, not a sketch.
 
 1. Pick a routing framework with the AI in chat — the Background's **Framework menu** is your reference if you haven't decided.
 2. Paste the **Build prompt**. The agent migrates the components into framework routes and replaces framework-dependent narrations.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ```
+   You are migrating a styled, client-only mockup to a real routing framework.
+
+   Routing framework: use whichever framework we agreed on earlier in this chat. If we haven't picked one, recommend the best fit for this app (see the Background section's Framework menu for the trade-offs) and proceed.
+
+   You may:
+   - Migrate existing screens to be framework routes with the framework's conventions.
+   - Use the framework's data-loading, form-handling, and navigation primitives.
+   - Continue using MSW for all network calls — tests/handlers.ts remains the source of truth for network behavior.
+
+   Still OFF-LIMITS — strict:
+   - No real backend, no real database, no auth provider.
+   - Do NOT delete any handlers from tests/handlers.ts.
+   - Do NOT introduce a server-side ORM or query layer.
+
+   For every narration tagged with the `framework` class (i.e. every `<aside class="narration framework">` opening with `<strong>Framework —</strong>`):
+   - REPLACE the narration with the real implementation using the framework's primitives (loaders, suspense boundaries, redirects, navigation hooks).
+   - Do NOT write tests for it in this sub-stage — that comes next.
+
+   Leave every `backend` narration in place — Stage 7 handles those.
+
+   Once you and the user have agreed on the routing framework and the overall route file structure, spawn one subagent per route to write its route file. Pass each subagent: (1) the route's URL pattern + the framework's loader/action signature, (2) the existing React component being moved into the route, (3) any `framework`-class narration tied to this route (with its `<strong>Framework —</strong>` prefix) so it can replace it inline. Wait for all subagents to finish, then have the parent wire them into the route config.
+
+   Output:
+   - The framework-migrated app.
+   - Updated tests/handlers.ts if new mocked endpoints emerged from framework data-loading patterns.
+   - A list of the replaced framework narrations with verbatim text (this list drives the next sub-stage's tests).
+   - A list of remaining narrations — all should be `backend` at this point.
+   ```
+
+   </details>
+
 3. Paste the **Add tests prompt**. The agent writes Playwright tests for the new routing behaviors (loading states, redirects, auth gates).
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are writing Playwright e2e tests for framework-mediated behaviors that were just implemented from narrations.
+
+   You will receive a list of <aside class="narration"> blocks that were replaced with implementation, including the verbatim text of each. For each one:
+   - Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior end-to-end through the framework's routing.
+   - Use ONLY page.getByRole() and page.getByLabel() locators. Where a route's URL is part of what the user perceives (shareable URLs, redirect targets), assert on it; otherwise prefer role/label assertions.
+   - For redirects and loading states, rely on Playwright's auto-waiting via expect(locator).toBeVisible() / .toHaveURL() rather than manual waitForTimeout calls.
+
+   Before this sub-stage is done, run the full test suite from all previous stages (structural lint + Stages 2–5 e2e). The expectation is that they pass unchanged. If a previous test fails:
+   1. First check: did this stage's new code change an accessible name, a heading, a label, an MSW handler shape, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
+   2. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the change.
+   3. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+   Spawn one subagent per replaced framework-dependent narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the route(s) involved, (3) the role/label-locator rule plus permission to assert on `.toHaveURL` where the user-facing URL is part of the narration's behavior. Wait for all subagents to finish, then run the full suite.
+
+   Output:
+   - One new test file per replaced narration, under tests/e2e/.
+   - Test run output showing: structural lint passing, Stages 2–5 e2e passing, all new tests passing.
+   ```
+
+   </details>
+
 4. Run the full suite — Stages 2–5 e2e tests still pass against the migrated app.
-
-<details>
-<summary>Build prompt</summary>
-
-```
-You are migrating a styled, client-only mockup to a real routing framework.
-
-Routing framework: use whichever framework we agreed on earlier in this chat. If we haven't picked one, recommend the best fit for this app (see the Background section's Framework menu for the trade-offs) and proceed.
-
-You may:
-- Migrate existing screens to be framework routes with the framework's conventions.
-- Use the framework's data-loading, form-handling, and navigation primitives.
-- Continue using MSW for all network calls — tests/handlers.ts remains the source of truth for network behavior.
-
-Still OFF-LIMITS — strict:
-- No real backend, no real database, no auth provider.
-- Do NOT delete any handlers from tests/handlers.ts.
-- Do NOT introduce a server-side ORM or query layer.
-
-For every narration tagged with the `framework` class (i.e. every `<aside class="narration framework">` opening with `<strong>Framework —</strong>`):
-- REPLACE the narration with the real implementation using the framework's primitives (loaders, suspense boundaries, redirects, navigation hooks).
-- Do NOT write tests for it in this sub-stage — that comes next.
-
-Leave every `backend` narration in place — Stage 7 handles those.
-
-Once you and the user have agreed on the routing framework and the overall route file structure, spawn one subagent per route to write its route file. Pass each subagent: (1) the route's URL pattern + the framework's loader/action signature, (2) the existing React component being moved into the route, (3) any `framework`-class narration tied to this route (with its `<strong>Framework —</strong>` prefix) so it can replace it inline. Wait for all subagents to finish, then have the parent wire them into the route config.
-
-Output:
-- The framework-migrated app.
-- Updated tests/handlers.ts if new mocked endpoints emerged from framework data-loading patterns.
-- A list of the replaced framework narrations with verbatim text (this list drives the next sub-stage's tests).
-- A list of remaining narrations — all should be `backend` at this point.
-```
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are writing Playwright e2e tests for framework-mediated behaviors that were just implemented from narrations.
-
-You will receive a list of <aside class="narration"> blocks that were replaced with implementation, including the verbatim text of each. For each one:
-- Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior end-to-end through the framework's routing.
-- Use ONLY page.getByRole() and page.getByLabel() locators. Where a route's URL is part of what the user perceives (shareable URLs, redirect targets), assert on it; otherwise prefer role/label assertions.
-- For redirects and loading states, rely on Playwright's auto-waiting via expect(locator).toBeVisible() / .toHaveURL() rather than manual waitForTimeout calls.
-
-Before this sub-stage is done, run the full test suite from all previous stages (structural lint + Stages 2–5 e2e). The expectation is that they pass unchanged. If a previous test fails:
-1. First check: did this stage's new code change an accessible name, a heading, a label, an MSW handler shape, or a URL? Fix the new code so the previous test passes again. Do NOT change the test.
-2. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the change.
-3. Do NOT silently disable, skip, weaken, or comment out a previous test.
-
-Spawn one subagent per replaced framework-dependent narration to write its test file. Pass each subagent: (1) the narration's verbatim text, (2) the route(s) involved, (3) the role/label-locator rule plus permission to assert on `.toHaveURL` where the user-facing URL is part of the narration's behavior. Wait for all subagents to finish, then run the full suite.
-
-Output:
-- One new test file per replaced narration, under tests/e2e/.
-- Test run output showing: structural lint passing, Stages 2–5 e2e passing, all new tests passing.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
@@ -1028,60 +1040,62 @@ Three narrations got replaced this stage:
 1. Pick a backend stack with the AI in chat — the Background's **Backend menu** is your reference if you haven't decided.
 2. Pick the next handler from `tests/handlers.ts` to migrate. Typically the one blocking the most user flows from working against real data.
 3. Paste the **Build prompt**. The agent implements the real route with the same request/response shape, deletes the corresponding MSW handler, and (if any narration is tied to it) replaces it with real UI.
+
+   <details>
+   <summary>Build prompt</summary>
+
+   ```
+   You are replacing ONE MSW handler with a real backend route. This is a one-at-a-time operation.
+
+   Backend stack: use the stack we agreed on earlier in this chat. If we haven't picked one, recommend the best fit for this app (see the Background section's Backend menu for the trade-offs) and proceed.
+
+   Handler to replace: pick the next handler from tests/handlers.ts to migrate — typically whichever blocks the most user flows from working against real data. Tell me which handler you picked before implementing.
+
+   Steps — in order, do not skip:
+   1. Read the existing MSW handler in tests/handlers.ts to learn the exact request and response shape.
+   2. Implement the real route with the SAME request and response contract. If the real implementation genuinely cannot match the contract, STOP and explain why before proceeding — do not silently change the contract.
+   3. Delete only that one handler from tests/handlers.ts.
+   4. If any `<aside class="narration backend">` (i.e. opening with `<strong>Backend —</strong>`) in the frontend is tied to this endpoint, replace it with real UI now. Note its verbatim text for the next sub-stage.
+
+   Constraints — strict:
+   - Change ONLY this one route this iteration. Do not touch other handlers or other routes.
+   - Do NOT modify frontend code unless the contract genuinely needs to change — and if it does, flag it before making any changes.
+   - Do NOT add or modify tests in this sub-stage. Tests come next.
+
+   Output:
+   - The new route implementation and any minimal infra needed (migrations, DB schema).
+   - A diff of tests/handlers.ts showing the one deletion.
+   - A list (possibly empty) of <aside class="narration"> blocks that were replaced this iteration, with verbatim text.
+   ```
+
+   </details>
+
 4. Paste the **Add tests prompt**. The agent runs the existing suite against the new mix of real backend + remaining MSW; adds a test for any narration that landed.
+
+   <details>
+   <summary>Add tests prompt</summary>
+
+   ```
+   You are writing Playwright e2e tests for any narration that landed alongside the backend route that just replaced an MSW handler.
+
+   For each <aside class="narration"> block that was replaced in this iteration's Build (the list may be empty):
+   - Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior end-to-end against the real backend.
+   - Use ONLY page.getByRole() and page.getByLabel() locators.
+
+   In all cases, run the full test suite from all previous stages. The MSW handler for this iteration's route has been deleted, so existing tests are now hitting the real endpoint — they must still pass. If a previous test fails:
+   1. First check: did the real route's request/response shape diverge from the deleted handler's contract? If yes, the divergence should have been flagged at Build — restore parity or document the deliberate contract change.
+   2. For latency-related flakiness, rely on Playwright's auto-waiting (expect(locator).toBeVisible() etc.). Do NOT add manual waitForTimeout calls.
+   3. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the change.
+   4. Do NOT silently disable, skip, weaken, or comment out a previous test.
+
+   Output:
+   - New test files for any narrations landed this iteration (may be zero).
+   - Test run output showing: structural lint passing, all Stages 2–6 tests passing against the new mix of real backend + remaining MSW.
+   ```
+
+   </details>
+
 5. Repeat steps 2–4 until `tests/handlers.ts` contains only third-party services.
-
-<details>
-<summary>Build prompt</summary>
-
-```
-You are replacing ONE MSW handler with a real backend route. This is a one-at-a-time operation.
-
-Backend stack: use the stack we agreed on earlier in this chat. If we haven't picked one, recommend the best fit for this app (see the Background section's Backend menu for the trade-offs) and proceed.
-
-Handler to replace: pick the next handler from tests/handlers.ts to migrate — typically whichever blocks the most user flows from working against real data. Tell me which handler you picked before implementing.
-
-Steps — in order, do not skip:
-1. Read the existing MSW handler in tests/handlers.ts to learn the exact request and response shape.
-2. Implement the real route with the SAME request and response contract. If the real implementation genuinely cannot match the contract, STOP and explain why before proceeding — do not silently change the contract.
-3. Delete only that one handler from tests/handlers.ts.
-4. If any `<aside class="narration backend">` (i.e. opening with `<strong>Backend —</strong>`) in the frontend is tied to this endpoint, replace it with real UI now. Note its verbatim text for the next sub-stage.
-
-Constraints — strict:
-- Change ONLY this one route this iteration. Do not touch other handlers or other routes.
-- Do NOT modify frontend code unless the contract genuinely needs to change — and if it does, flag it before making any changes.
-- Do NOT add or modify tests in this sub-stage. Tests come next.
-
-Output:
-- The new route implementation and any minimal infra needed (migrations, DB schema).
-- A diff of tests/handlers.ts showing the one deletion.
-- A list (possibly empty) of <aside class="narration"> blocks that were replaced this iteration, with verbatim text.
-```
-
-</details>
-
-<details>
-<summary>Add tests prompt</summary>
-
-```
-You are writing Playwright e2e tests for any narration that landed alongside the backend route that just replaced an MSW handler.
-
-For each <aside class="narration"> block that was replaced in this iteration's Build (the list may be empty):
-- Write a Playwright e2e test at tests/e2e/[descriptive-name].test.ts that asserts the narration's described behavior end-to-end against the real backend.
-- Use ONLY page.getByRole() and page.getByLabel() locators.
-
-In all cases, run the full test suite from all previous stages. The MSW handler for this iteration's route has been deleted, so existing tests are now hitting the real endpoint — they must still pass. If a previous test fails:
-1. First check: did the real route's request/response shape diverge from the deleted handler's contract? If yes, the divergence should have been flagged at Build — restore parity or document the deliberate contract change.
-2. For latency-related flakiness, rely on Playwright's auto-waiting (expect(locator).toBeVisible() etc.). Do NOT add manual waitForTimeout calls.
-3. If the failure reflects a deliberate product change, update the test in its own commit with a message that names the change.
-4. Do NOT silently disable, skip, weaken, or comment out a previous test.
-
-Output:
-- New test files for any narrations landed this iteration (may be zero).
-- Test run output showing: structural lint passing, all Stages 2–6 tests passing against the new mix of real backend + remaining MSW.
-```
-
-</details>
 
 <details>
 <summary>Background</summary>
