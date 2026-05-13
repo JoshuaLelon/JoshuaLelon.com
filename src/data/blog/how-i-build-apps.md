@@ -26,6 +26,8 @@ I build apps in seven stages:
 
 After Stage 7 you have a deployed app with a real backend and an e2e suite covering every flow. Where you go from there is up to you — [a few directions worth knowing about](#you-can-take-it-from-here).
 
+Throughout this post we'll use a small **notes app** as a running example — sign up, list your notes, create / edit / delete, share with a teammate. Each stage has an "Example" collapsible showing what the notes app looks like at that stage, so the abstract operations have something concrete to land on.
+
 ## Contents
 
 - [Why bother with a process](#why-bother-with-a-process)
@@ -63,9 +65,9 @@ Generate static HTML wireframes — one file per screen, linked with `<a href>`s
 <summary>Build prompt</summary>
 
 ```
-You are helping me wireframe a web app: [DESCRIBE THE APP IN 1-2 SENTENCES].
+You are wireframing the web app we just discussed.
 
-Flows to cover: [LIST FLOWS, e.g. "sign up, create a note, share a note, delete account"].
+Cover the core flows: the primary value flow plus the supporting flows (sign-up / auth, settings, etc.) that the app needs. If a flow we haven't talked about yet should obviously exist, propose it inline and continue.
 
 Constraints — strict:
 - Only static .html files. One file per screen.
@@ -121,6 +123,28 @@ Output:
 - A package.json with one script entry: "lint:wireframe": "node tests/wireframe-lint.mjs".
 - Example run output showing the assertions passing and the narration count.
 ```
+
+</details>
+
+<details>
+<summary>Example</summary>
+
+A handful of static `.html` files linked with `<a href>`s:
+
+- `index.html` — landing page, link to sign-up
+- `signup.html`, `login.html` — auth screens (forms only; submitting goes nowhere yet)
+- `notes.html` — the list view (a static `<ul>` with a placeholder row or two)
+- `new-note.html` — the create form (Title, Content, Tags)
+- `note.html` — the detail / edit view
+
+A handful of narrations authored along the way:
+
+- In `new-note.html`: *"When the user clicks Submit, the note slides up off the screen with a 200ms ease-out, then a green toast fades in reading 'Note saved.'"*
+- In `notes.html`: *"A sort dropdown above the list switches the order: newest first / oldest first / alphabetical by title."*
+- In `note.html`: *"Clicking Delete opens a modal asking 'Are you sure?' with Cancel and Confirm buttons."*
+- In `new-note.html`: *"As the user types in the Tags field, an autosuggest list shows existing tags from prior notes."*
+
+The nav has a pencil-and-paper icon as inline `<svg>` with `<title>` "Notes app".
 
 </details>
 
@@ -239,6 +263,47 @@ Output:
 </details>
 
 <details>
+<summary>Example</summary>
+
+Same `.html` files as Stage 1, plus a small inline `<script>` in `new-note.html` and `note.html`:
+
+```html
+<!-- new-note.html -->
+<script>
+  document.querySelector('form').addEventListener('submit', e => {
+    e.preventDefault();
+    const params = new URLSearchParams(new FormData(e.target));
+    location.href = `note.html?${params}`;
+  });
+</script>
+```
+
+```html
+<!-- note.html -->
+<script>
+  const params = new URLSearchParams(location.search);
+  document.querySelector('h1').textContent = params.get('title') || 'Untitled';
+  document.querySelector('.content').textContent = params.get('content') || '';
+</script>
+```
+
+One Playwright test, `tests/e2e/create-note.test.ts`:
+
+```ts
+test('create note flow', async ({ page }) => {
+  await page.goto('/new-note.html');
+  await page.getByLabel('Title').fill('My first note');
+  await page.getByLabel('Content').fill('Hello world');
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByRole('heading', { name: 'My first note' })).toBeVisible();
+});
+```
+
+All four Stage 1 narrations stay untouched — they describe behavior beyond this stage's reach.
+
+</details>
+
+<details>
 <summary>Background</summary>
 
 Once a flow feels right, the wireframe gets the minimum vanilla JavaScript that makes it *behaviorally testable*: inline `<script>` blocks that intercept form submits and render the next screen with typed values carried forward. That single capability — **user input becomes observable to the next screen** — is what unlocks the first real Playwright assertion. A test can now type into *Title*, click Submit, and verify the typed value appears as a heading on the next page:
@@ -334,6 +399,28 @@ Output:
 </details>
 
 <details>
+<summary>Example</summary>
+
+The wireframes are refactored into React components:
+
+- `App.jsx` — root with `<Routes>` (still a simple client router; framework migration is Stage 6)
+- `NotesList.jsx` — renders the list, owns the sort dropdown
+- `NoteForm.jsx` — create / edit form
+- `NoteDetail.jsx` — read view with Delete button + confirm modal
+- `NotesContext.jsx` — `useReducer` holding the notes array in memory
+
+Narrations *replaced this stage*:
+
+- **Sort dropdown** → a `<select>` with `useState`; `NotesList` re-renders a `useMemo`-sorted array
+- **Delete-confirm modal** → a controlled boolean state in `NoteDetail`; an unstyled `<div role="dialog">` with Cancel and Confirm
+
+Narrations *still in place*: slide-up + toast on save (needs styling), autosuggest tags (needs network), route transitions (needs framework routing).
+
+The app looks bare — no Tailwind, no shadcn — but the state model is right.
+
+</details>
+
+<details>
 <summary>Background</summary>
 
 This is where React enters and the state model jumps a level. Stage 2 was single-hop (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. The inline `<script>` blocks become real components; React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, and any cross-screen invariant the tests want to assert. There's no network yet, and no styling yet either. The artifact at the end of this stage is ugly but stateful.
@@ -402,6 +489,46 @@ Output:
 - One new test file per replaced narration, under tests/e2e/.
 - Test run output showing: structural lint passing, Stage 2 + Stage 3 e2e passing, all new tests passing.
 ```
+
+</details>
+
+<details>
+<summary>Example</summary>
+
+MSW arrives. New `tests/handlers.ts`:
+
+```ts
+import { http, HttpResponse } from 'msw'
+
+let notes = [{ id: '1', title: 'Welcome', content: '...', tags: ['intro'] }]
+
+export const handlers = [
+  http.get('/api/notes', () => HttpResponse.json(notes)),
+  http.post('/api/notes', async ({ request }) => {
+    const note = { id: crypto.randomUUID(), ...(await request.json() as object) }
+    notes.push(note)
+    return HttpResponse.json(note)
+  }),
+  http.delete('/api/notes/:id', ({ params }) => {
+    notes = notes.filter(n => n.id !== params.id)
+    return new HttpResponse(null, { status: 204 })
+  }),
+  http.get('/api/tags', ({ request }) => {
+    const q = new URL(request.url).searchParams.get('q') ?? ''
+    const all = ['intro', 'todo', 'shopping', 'ideas']
+    return HttpResponse.json(all.filter(t => t.startsWith(q)))
+  }),
+]
+```
+
+`NotesList` now calls `fetch('/api/notes')` on mount; `NoteForm` posts on submit.
+
+Narrations *replaced this stage*:
+
+- **Autosuggest tags** → debounced fetch to `/api/tags?q=...`; results render in a `<ul role="listbox">`
+- **Error toast on save failure** → per-test override `network.use(http.post('/api/notes', () => new HttpResponse(null, { status: 500 })))` flips the app into an error path
+
+Narrations *still in place*: slide-up animation (Stage 5), route transitions (Stage 6).
 
 </details>
 
@@ -477,6 +604,28 @@ Output:
 </details>
 
 <details>
+<summary>Example</summary>
+
+Tailwind utility classes go on every component. shadcn/ui replaces the bare HTML primitives:
+
+- `Button` for Submit, Cancel, Delete, Confirm
+- `Dialog` for the delete-confirm modal (replaces the unstyled `<div role="dialog">` from Stage 3)
+- `Input` and `Textarea` for the form fields
+- A `Sonner` `<Toaster />` mounted at the app root for save / error toasts
+
+Narrations *replaced this stage*:
+
+- **Slide-up + green toast on save** → CSS transition on `NoteDetail` mount, plus `toast.success('Note saved')`
+- **Hover state on note cards** → Tailwind `hover:` utilities lift the card and reveal a quick-actions menu
+- **Focus indicators** → Tailwind `focus-visible:` ring on every interactive element
+
+Regression check: every `getByRole('button', { name: '…' })` and `getByLabel('Title')` from Stage 2–4 tests still resolves. shadcn's `Button` preserves the underlying `<button>` role; shadcn's `Dialog` keeps the `role="dialog"` that Stage 3's plain `<div>` already had.
+
+The app looks like an app now.
+
+</details>
+
+<details>
 <summary>Background</summary>
 
 The polish pass. The app already works — state, behaviors, and network seam are all in place from Stages 3 and 4. This stage makes it look like an app. Tailwind + shadcn/ui replace bare HTML elements with styled components. Any narration that specified visual fidelity (a specific card layout, an animation, a hover state) becomes a real implementation. The biggest risk at this stage is accidentally breaking accessible names — a careless wrap around a button or a class swap that drops the `<button>` role for a `<div onclick>` will break every prior Playwright test. The Add tests sub-stage here is mostly a regression check.
@@ -503,7 +652,7 @@ Migrate the prototype onto a routing framework of your choice.
 ```
 You are migrating a styled, client-only mockup to a real routing framework.
 
-Framework — my choice: [FILL IN, e.g. "Next.js App Router", "React Router v7 framework mode", "SvelteKit", "Astro with islands", "TanStack Router"].
+Routing framework: use whichever framework we agreed on earlier in this chat. If we haven't picked one, recommend the best fit for this app (see the Background section's Framework menu for the trade-offs) and proceed.
 
 You may:
 - Migrate existing screens to be framework routes with the framework's conventions.
@@ -552,6 +701,36 @@ Output:
 </details>
 
 <details>
+<summary>Example</summary>
+
+Migrate to **React Router v7 (framework mode)** — assume that's what the chat agreed on; Next.js, TanStack Router, and Astro work the same way conceptually.
+
+New route file structure:
+
+```
+app/
+  routes.ts                — route config
+  root.tsx                 — layout shell
+  routes/
+    _index.tsx             — landing
+    signup.tsx
+    login.tsx
+    notes._index.tsx       — list
+    notes.$id.tsx          — detail
+    notes.new.tsx          — create
+```
+
+Narrations *replaced this stage*:
+
+- **Route transition animation** → React Router's `<NavLink>` + a `view-transition` CSS hook
+- **Loading state on `/notes`** → the framework's `<Suspense>` boundary with a skeleton fallback while the route loader fetches notes
+- **Auth-gated `/notes`** → a `redirect('/login')` in the route loader when the session cookie is missing
+
+`tests/handlers.ts` is unchanged — every fetch still hits MSW. The Stage 2–5 e2e tests pass against the migrated app because the role/label locators didn't move.
+
+</details>
+
+<details>
 <summary>Background</summary>
 
 A routing framework enters. The network is still MSW. In dev, the app itself runs against the mock handlers — this means the prototype is *demoable* to real users before any backend exists. Existing tests don't change.
@@ -587,9 +766,9 @@ Replace one MSW handler with a real backend route. Repeat.
 ```
 You are replacing ONE MSW handler with a real backend route. This is a one-at-a-time operation.
 
-Backend stack — my choice: [FILL IN, e.g. "Node + Hono + Drizzle + SQLite", "Bun + Elysia + Postgres", "Python + FastAPI + SQLAlchemy + Postgres", "Go + chi + sqlc + Postgres"].
+Backend stack: use the stack we agreed on earlier in this chat. If we haven't picked one, recommend the best fit for this app (see the Background section's Backend menu for the trade-offs) and proceed.
 
-Handler to replace: [HANDLER NAME OR PATH, e.g. "POST /api/notes"].
+Handler to replace: pick the next handler from tests/handlers.ts to migrate — typically whichever blocks the most user flows from working against real data. Tell me which handler you picked before implementing.
 
 Steps — in order, do not skip:
 1. Read the existing MSW handler in tests/handlers.ts to learn the exact request and response shape.
@@ -630,6 +809,23 @@ Output:
 - New test files for any narrations landed this iteration (may be zero).
 - Test run output showing: structural lint passing, all Stages 2–6 tests passing against the new mix of real backend + remaining MSW.
 ```
+
+</details>
+
+<details>
+<summary>Example</summary>
+
+**Iteration 1 — `GET /api/notes`:**
+
+- Implement in **Hono + Drizzle + SQLite** (or whatever stack the chat picked): a `notes` table, a `notesRouter.get('/api/notes', ...)` returning `SELECT * FROM notes WHERE user_id = ?`.
+- Delete the `http.get('/api/notes', ...)` handler from `tests/handlers.ts`.
+- Re-run the e2e suite. Stages 2–6 tests still pass — they assert on UI, not on which side of the wire the data came from.
+
+**Iteration 2 — `POST /api/notes`:** same dance.
+
+**Iteration 3 — auth (`POST /api/signup`, `POST /api/login`, session cookie):** same dance, in a single iteration since these three are coupled.
+
+By the end, `tests/handlers.ts` contains only handlers for third-party services (e.g., a hypothetical Slack webhook if the share-with-teammate flow uses one) — those mark the permanent system boundary, not the migration backlog.
 
 </details>
 
