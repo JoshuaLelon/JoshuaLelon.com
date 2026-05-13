@@ -127,50 +127,6 @@ Output:
 </details>
 
 <details>
-<summary>Example</summary>
-
-Before pasting Stage 1's Build prompt, I told the agent in chat: *"I want a small notes app — sign up, list my notes, create new ones with tags, and share a note with one teammate."*
-
-The agent's first pass had five screens but treated note creation and editing as separate flows. I asked it to combine them. It also asked whether *share* should be a public URL or an invite to a specific person — I picked invite, so it added a share-modal narration to the note view.
-
-The flow we settled on:
-
-```
-index.html → signup.html → notes.html ⇄ new-note.html
-                                ↕
-                            note.html  → (delete-confirm modal)
-                                       → (share modal)
-```
-
-A snippet of `new-note.html`:
-
-```html
-<form>
-  <label for="title">Title</label>
-  <input id="title" name="title" type="text" required>
-
-  <label for="content">Content</label>
-  <textarea id="content" name="content" required></textarea>
-
-  <label for="tags">Tags</label>
-  <input id="tags" name="tags" type="text">
-  <aside class="narration">
-    As the user types, autosuggest from prior tags appears as a listbox.
-  </aside>
-
-  <button type="submit">Submit</button>
-  <aside class="narration">
-    On Submit, the note slides up off the screen and a green
-    "Note saved" toast fades in for ~3s.
-  </aside>
-</form>
-```
-
-Four narrations end up authored across the screens (slide-up + toast, sort dropdown on the list, delete-confirm modal, tags autosuggest). Everything else is plain Wireframe HTML.
-
-</details>
-
-<details>
 <summary>Background</summary>
 
 A folder of static `.html` files, one per screen, linked with `<a href>`s. The cheapest possible artifact for arguing about the *flow*. Static HTML beats Figma here because you can actually navigate it — you click through and feel whether the flow is right. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post for the framing.) If the flow is wrong, you'd rather discover it now than after you've wired up state management.
@@ -224,6 +180,50 @@ A strict subset of HTML is sufficient to describe the flow of any app, given tha
 - **The escape hatch:** `<aside class="narration">`.
 
 Notable omissions and where they go instead: `<img>`, `<canvas>`, `<video>`, `<audio>`, `<input type="range|color|file">`, anything requiring `<script>` → narrations. (For images: anything that needs real visual fidelity — logos, photos, screenshots — is a placeholder you don't have assets for yet, so describe what it's meant to convey. Anything simple enough to express as shapes belongs in inline `<svg>` instead.) Presentational tags (`<b>`, `<i>`, `<small>`, `<br>`, `<hr>`) → wait for Stage 5 styling.
+
+</details>
+
+<details>
+<summary>Example</summary>
+
+Before pasting Stage 1's Build prompt, I told the agent in chat: *"I want a small notes app — sign up, list my notes, create new ones with tags, and share a note with one teammate."*
+
+The agent's first pass had five screens but treated note creation and editing as separate flows. I asked it to combine them. It also asked whether *share* should be a public URL or an invite to a specific person — I picked invite, so it added a share-modal narration to the note view.
+
+The flow we settled on:
+
+```
+index.html → signup.html → notes.html ⇄ new-note.html
+                                ↕
+                            note.html  → (delete-confirm modal)
+                                       → (share modal)
+```
+
+A snippet of `new-note.html`:
+
+```html
+<form>
+  <label for="title">Title</label>
+  <input id="title" name="title" type="text" required>
+
+  <label for="content">Content</label>
+  <textarea id="content" name="content" required></textarea>
+
+  <label for="tags">Tags</label>
+  <input id="tags" name="tags" type="text">
+  <aside class="narration">
+    As the user types, autosuggest from prior tags appears as a listbox.
+  </aside>
+
+  <button type="submit">Submit</button>
+  <aside class="narration">
+    On Submit, the note slides up off the screen and a green
+    "Note saved" toast fades in for ~3s.
+  </aside>
+</form>
+```
+
+Four narrations end up authored across the screens (slide-up + toast, sort dropdown on the list, delete-confirm modal, tags autosuggest). Everything else is plain Wireframe HTML.
 
 </details>
 
@@ -285,6 +285,41 @@ Output:
 </details>
 
 <details>
+<summary>Background</summary>
+
+Once a flow feels right, the wireframe gets the minimum vanilla JavaScript that makes it *behaviorally testable*: inline `<script>` blocks that intercept form submits and render the next screen with typed values carried forward. That single capability — **user input becomes observable to the next screen** — is what unlocks the first real Playwright assertion. A test can now type into *Title*, click Submit, and verify the typed value appears as a heading on the next page:
+
+```ts
+await page.getByLabel('Title').fill('My note')
+await page.getByLabel('Content').fill('Hello world')
+await page.getByRole('button', { name: 'Submit' }).click()
+await expect(page.getByRole('heading', { name: 'My note' })).toBeVisible()
+```
+
+Without that JS, the only thing a test could check is link navigation — which the Stage 1 lint already proves statically. The JS is what gives Stage 2's tests something *new* to assert. Each test is maybe twenty lines and becomes the load-bearing contract for its flow for the rest of the project's life.
+
+The state model here is **single-hop**: typed values flow as a side effect of one navigation, then evaporate. Hit back, refresh, or take a different path and they're gone. No store, no persistence, no cross-screen visibility. That's deliberate — it's the simplest model that's behaviorally testable, and it's enough to validate that the *flow* works before anything richer enters.
+
+Playwright enters here as one of the two locked-in tools — its role/label locator API is the contract that survives every subsequent rewrite, which is why it isn't swappable.
+
+- **Tech introduced:** Vanilla JavaScript (inline `<script>` only) at Build; Playwright at Add tests.
+- **Off-limits during Build:** CSS, any framework, component libraries, bundlers, state libraries, npm dependencies in the app itself (Playwright is dev-only).
+- **Narrations:** untouched. Leave them in place — they describe behavior beyond the reach of this stage.
+
+**Why anchor on roles and labels**
+
+Most testing advice falls apart in practice because **tests break for the wrong reasons**. You write an integration test against `signInWithEmail()`, you refactor the auth module, the test is now a paperweight — even though the product behavior didn't change at all. That's the failure mode: the test was coupled to an implementation detail, not to anything a user or a caller would notice.
+
+The fix isn't to find things that never change. It's to anchor tests to the things that change *only when product behavior changes*. Two qualify:
+
+1. **What the user sees and clicks.** "The button named *Submit*." "The input labelled *Email*." "The heading *Welcome back*." The URL in the address bar counts too — it's something the user perceives and shares. When these change, the product changed: somebody renamed a button, removed a field, reworded a flow, restructured the routes. The test *should* fail; that's the whole point of having it. When you swap React for Svelte, or rewrite the HTML, these don't move, so the test doesn't either.
+2. **The I/O at the system boundary.** `POST /notes` takes `{title, content}` and returns `{id, title, content, createdAt}`. The outbound `POST https://hooks.slack.com/...` carries `{channel, text}`. The boundary isn't "frontend ↔ backend" — it's "code I own ↔ code I don't." When any of those contracts change, somebody altered what the system does and the test *should* fail. When the implementation behind them changes — `<script>` tag, MSW handler, real Postgres — the contracts hold and the test rides along.
+
+That's the whole game: tests fail when the product changes and stay quiet when it doesn't. Coupling them to roles, URLs, and boundary I/O is what buys you that property. The role/label half is what's anchoring the test above; the boundary-I/O half becomes explicit at Stage 4 when MSW arrives and the network contracts move into version control.
+
+</details>
+
+<details>
 <summary>Example</summary>
 
 Stage 1's Add tests prompt produced the structural lint, which flagged one input on the share modal that was missing a `<label for>`. I asked the agent to fix it; it patched the wireframe and the lint went green.
@@ -324,41 +359,6 @@ test('create note flow', async ({ page }) => {
 ```
 
 The four Stage 1 narrations stay in place — they all describe behavior beyond what plain JS can deliver here.
-
-</details>
-
-<details>
-<summary>Background</summary>
-
-Once a flow feels right, the wireframe gets the minimum vanilla JavaScript that makes it *behaviorally testable*: inline `<script>` blocks that intercept form submits and render the next screen with typed values carried forward. That single capability — **user input becomes observable to the next screen** — is what unlocks the first real Playwright assertion. A test can now type into *Title*, click Submit, and verify the typed value appears as a heading on the next page:
-
-```ts
-await page.getByLabel('Title').fill('My note')
-await page.getByLabel('Content').fill('Hello world')
-await page.getByRole('button', { name: 'Submit' }).click()
-await expect(page.getByRole('heading', { name: 'My note' })).toBeVisible()
-```
-
-Without that JS, the only thing a test could check is link navigation — which the Stage 1 lint already proves statically. The JS is what gives Stage 2's tests something *new* to assert. Each test is maybe twenty lines and becomes the load-bearing contract for its flow for the rest of the project's life.
-
-The state model here is **single-hop**: typed values flow as a side effect of one navigation, then evaporate. Hit back, refresh, or take a different path and they're gone. No store, no persistence, no cross-screen visibility. That's deliberate — it's the simplest model that's behaviorally testable, and it's enough to validate that the *flow* works before anything richer enters.
-
-Playwright enters here as one of the two locked-in tools — its role/label locator API is the contract that survives every subsequent rewrite, which is why it isn't swappable.
-
-- **Tech introduced:** Vanilla JavaScript (inline `<script>` only) at Build; Playwright at Add tests.
-- **Off-limits during Build:** CSS, any framework, component libraries, bundlers, state libraries, npm dependencies in the app itself (Playwright is dev-only).
-- **Narrations:** untouched. Leave them in place — they describe behavior beyond the reach of this stage.
-
-**Why anchor on roles and labels**
-
-Most testing advice falls apart in practice because **tests break for the wrong reasons**. You write an integration test against `signInWithEmail()`, you refactor the auth module, the test is now a paperweight — even though the product behavior didn't change at all. That's the failure mode: the test was coupled to an implementation detail, not to anything a user or a caller would notice.
-
-The fix isn't to find things that never change. It's to anchor tests to the things that change *only when product behavior changes*. Two qualify:
-
-1. **What the user sees and clicks.** "The button named *Submit*." "The input labelled *Email*." "The heading *Welcome back*." The URL in the address bar counts too — it's something the user perceives and shares. When these change, the product changed: somebody renamed a button, removed a field, reworded a flow, restructured the routes. The test *should* fail; that's the whole point of having it. When you swap React for Svelte, or rewrite the HTML, these don't move, so the test doesn't either.
-2. **The I/O at the system boundary.** `POST /notes` takes `{title, content}` and returns `{id, title, content, createdAt}`. The outbound `POST https://hooks.slack.com/...` carries `{channel, text}`. The boundary isn't "frontend ↔ backend" — it's "code I own ↔ code I don't." When any of those contracts change, somebody altered what the system does and the test *should* fail. When the implementation behind them changes — `<script>` tag, MSW handler, real Postgres — the contracts hold and the test rides along.
-
-That's the whole game: tests fail when the product changes and stay quiet when it doesn't. Coupling them to roles, URLs, and boundary I/O is what buys you that property. The role/label half is what's anchoring the test above; the boundary-I/O half becomes explicit at Stage 4 when MSW arrives and the network contracts move into version control.
 
 </details>
 
@@ -423,6 +423,19 @@ Output:
 </details>
 
 <details>
+<summary>Background</summary>
+
+This is where React enters and the state model jumps a level. Stage 2 was single-hop (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. The inline `<script>` blocks become real components; React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, and any cross-screen invariant the tests want to assert. There's no network yet, and no styling yet either. The artifact at the end of this stage is ugly but stateful.
+
+React is the default runtime from this stage onward — the rest of the stack defaults (hooks, Tailwind, shadcn/ui) are React-shaped. To swap React out, edit the Build prompt below; note that the styling and state defaults are React-specific, so a framework swap also swaps those.
+
+- **Tech introduced:** React (default — swap to Svelte/Vue/Solid by editing the prompt), React hooks for state, a bundler (default: Vite).
+- **Off-limits:** styling beyond default browser rendering, network calls, routing framework, real backend.
+- **Narrations:** in Build, replace any *state-only* narration whose behavior needs only React + in-memory state (in-memory modal/dropdown toggles, client-side sorting/filtering, list rendering from local state, tab switching). The matching tests land in Add tests. Leave narrations that need network, styling, framework routing, or a backend.
+
+</details>
+
+<details>
 <summary>Example</summary>
 
 Stage 3's Build prompt refactored the HTML into React. The agent picked Vite as the bundler without asking — that's the default; fine. It proposed `useReducer` for the notes collection since we'll be appending and removing entries; I agreed.
@@ -463,19 +476,6 @@ function NotesList({ notes }) {
 ```
 
 Three narrations still in place: slide-up + toast (Stage 5), autosuggest tags (Stage 4), route transitions (Stage 6).
-
-</details>
-
-<details>
-<summary>Background</summary>
-
-This is where React enters and the state model jumps a level. Stage 2 was single-hop (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. The inline `<script>` blocks become real components; React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, and any cross-screen invariant the tests want to assert. There's no network yet, and no styling yet either. The artifact at the end of this stage is ugly but stateful.
-
-React is the default runtime from this stage onward — the rest of the stack defaults (hooks, Tailwind, shadcn/ui) are React-shaped. To swap React out, edit the Build prompt below; note that the styling and state defaults are React-specific, so a framework swap also swaps those.
-
-- **Tech introduced:** React (default — swap to Svelte/Vue/Solid by editing the prompt), React hooks for state, a bundler (default: Vite).
-- **Off-limits:** styling beyond default browser rendering, network calls, routing framework, real backend.
-- **Narrations:** in Build, replace any *state-only* narration whose behavior needs only React + in-memory state (in-memory modal/dropdown toggles, client-side sorting/filtering, list rendering from local state, tab switching). The matching tests land in Add tests. Leave narrations that need network, styling, framework routing, or a backend.
 
 </details>
 
@@ -539,6 +539,19 @@ Output:
 </details>
 
 <details>
+<summary>Background</summary>
+
+MSW arrives as the network seam. The React app from Stage 3 can now make `fetch` calls; MSW intercepts them and returns mocked responses. Default handlers live in `tests/handlers.ts` — that file is now my materialized backend backlog. Anything that previously couldn't be expressed because it required a network round-trip (autosuggest, server errors, optimistic UI, save-then-reload) becomes implementable. The artifact at the end of this stage is functionally complete but visually still bare.
+
+MSW is the second of the two locked-in tools. Intercepting at the network layer (not at a function call) is what lets the same handlers serve as the mock backend in tests, in dev, and as the migration checklist when the real backend lands at Stage 7.
+
+- **Tech introduced:** MSW (locked in — do not swap), `fetch` calls in the app.
+- **Off-limits:** styling, routing framework, real backend, database, auth provider.
+- **Narrations:** in Build, replace any *network-dependent* narration (autosuggest, server errors, optimistic UI with rollback, save-then-reload round trips). The matching tests land in Add tests. Leave narrations that need styling, framework routing, or a real backend.
+
+</details>
+
+<details>
 <summary>Example</summary>
 
 Stage 4's Build prompt added MSW and four handlers. The agent suggested using TanStack Query for fetch ergonomics; I declined for this iteration (vanilla `fetch` + `useEffect` is enough for now, and one less dependency to learn).
@@ -575,19 +588,6 @@ Two narrations got replaced this stage:
 - **Error toast on save failure** → a Playwright test overrides `POST /api/notes` to return 500 (`network.use(http.post(…))`), and the app's error path renders a visible error message.
 
 Slide-up animation (Stage 5) and route transitions (Stage 6) stay narrated.
-
-</details>
-
-<details>
-<summary>Background</summary>
-
-MSW arrives as the network seam. The React app from Stage 3 can now make `fetch` calls; MSW intercepts them and returns mocked responses. Default handlers live in `tests/handlers.ts` — that file is now my materialized backend backlog. Anything that previously couldn't be expressed because it required a network round-trip (autosuggest, server errors, optimistic UI, save-then-reload) becomes implementable. The artifact at the end of this stage is functionally complete but visually still bare.
-
-MSW is the second of the two locked-in tools. Intercepting at the network layer (not at a function call) is what lets the same handlers serve as the mock backend in tests, in dev, and as the migration checklist when the real backend lands at Stage 7.
-
-- **Tech introduced:** MSW (locked in — do not swap), `fetch` calls in the app.
-- **Off-limits:** styling, routing framework, real backend, database, auth provider.
-- **Narrations:** in Build, replace any *network-dependent* narration (autosuggest, server errors, optimistic UI with rollback, save-then-reload round trips). The matching tests land in Add tests. Leave narrations that need styling, framework routing, or a real backend.
 
 </details>
 
@@ -650,6 +650,19 @@ Output:
 </details>
 
 <details>
+<summary>Background</summary>
+
+The polish pass. The app already works — state, behaviors, and network seam are all in place from Stages 3 and 4. This stage makes it look like an app. Tailwind + shadcn/ui replace bare HTML elements with styled components. Any narration that specified visual fidelity (a specific card layout, an animation, a hover state) becomes a real implementation. The biggest risk at this stage is accidentally breaking accessible names — a careless wrap around a button or a class swap that drops the `<button>` role for a `<div onclick>` will break every prior Playwright test. The Add tests sub-stage here is mostly a regression check.
+
+Tailwind + shadcn/ui are the styling defaults — Tailwind is framework-agnostic; shadcn/ui is React-specific (community ports exist for Svelte/Solid/Vue). Swap to Open Props, Pico.css, or another approach by editing the Build prompt.
+
+- **Tech introduced:** Tailwind (default — swap by editing the prompt), shadcn/ui for components (default — React-specific; community ports exist for Svelte/Solid/Vue).
+- **Off-limits:** routing framework, real backend, database, auth provider.
+- **Narrations:** in Build, replace any *style-only* narration (specific card layouts, animations and transitions, hover states, color schemes, focus indicators, spacing rhythms). The matching tests (where the behavior is testable — most aren't) land in Add tests. Leave narrations that need framework routing or a backend.
+
+</details>
+
+<details>
 <summary>Example</summary>
 
 Stage 5's Build prompt swapped Stage 3's bare HTML primitives for shadcn/ui components and laid Tailwind utilities on top. The agent flagged one issue mid-swap: replacing the unstyled `<div role="dialog">` from Stage 3 with shadcn's `<Dialog>` *almost* dropped the `role="dialog"` attribute (different markup tree). It paused, asked me to confirm the Stage 3 test should keep finding the dialog by role, and emitted the swap with the role preserved.
@@ -670,19 +683,6 @@ One representative diff — the form's Submit button:
 shadcn's `<Button>` renders an underlying `<button>`, so `getByRole('button', { name: 'Submit' })` from the Stage 2 test still resolves. The regression-check pass found and fixed the one ARIA slip described above; the suite went green.
 
 The app reads as a real product now, not a sketch.
-
-</details>
-
-<details>
-<summary>Background</summary>
-
-The polish pass. The app already works — state, behaviors, and network seam are all in place from Stages 3 and 4. This stage makes it look like an app. Tailwind + shadcn/ui replace bare HTML elements with styled components. Any narration that specified visual fidelity (a specific card layout, an animation, a hover state) becomes a real implementation. The biggest risk at this stage is accidentally breaking accessible names — a careless wrap around a button or a class swap that drops the `<button>` role for a `<div onclick>` will break every prior Playwright test. The Add tests sub-stage here is mostly a regression check.
-
-Tailwind + shadcn/ui are the styling defaults — Tailwind is framework-agnostic; shadcn/ui is React-specific (community ports exist for Svelte/Solid/Vue). Swap to Open Props, Pico.css, or another approach by editing the Build prompt.
-
-- **Tech introduced:** Tailwind (default — swap by editing the prompt), shadcn/ui for components (default — React-specific; community ports exist for Svelte/Solid/Vue).
-- **Off-limits:** routing framework, real backend, database, auth provider.
-- **Narrations:** in Build, replace any *style-only* narration (specific card layouts, animations and transitions, hover states, color schemes, focus indicators, spacing rhythms). The matching tests (where the behavior is testable — most aren't) land in Add tests. Leave narrations that need framework routing or a backend.
 
 </details>
 
@@ -749,6 +749,28 @@ Output:
 </details>
 
 <details>
+<summary>Background</summary>
+
+A routing framework enters. The network is still MSW. In dev, the app itself runs against the mock handlers — this means the prototype is *demoable* to real users before any backend exists. Existing tests don't change.
+
+- **Tech introduced:** a routing framework of your choice (menu below).
+- **Off-limits:** real backend, real database, auth provider. `tests/handlers.ts` is still the entire network layer.
+- **Narrations:** in Build, replace any narration whose behavior depends on framework features (loading states, route transitions, redirects, suspense boundaries, error boundaries, auth-gated routes, server-rendered initial state). Tests for them land in Add tests. Backend-dependent narrations stay.
+
+**Framework menu**
+
+No prescribed default — pick by what your app needs to do:
+
+- **Next.js App Router** — the most batteries-included option. Server components, image optimization, file-based routing, first-class Vercel deployment. Strong choice if you want minimal infrastructure decisions and Vercel-style hosting.
+- **React Router v7 (framework mode)** — closest to plain React, less opinionated. Strong choice if you want flexibility and a smaller surface area.
+- **TanStack Router** — newer, with route-level type safety better than either of the above. Strong choice if type-safe routing is the property you care most about.
+- **Astro (with React islands)** — content-first, hydrates interactivity selectively. Strong choice if most of your app is content with sprinkles of interaction.
+
+The only hard constraint: the framework migration must preserve accessible names. Your Stages 2–5 Playwright tests are anchored to roles and labels, not to component identities — if those don't move, the tests keep passing.
+
+</details>
+
+<details>
 <summary>Example</summary>
 
 The chat had already landed on **React Router v7 (framework mode)** as the framework. Next.js was the runner-up; I picked React Router because I wanted to keep deployment flexible (any static host or Node server).
@@ -775,28 +797,6 @@ Three narrations got replaced this stage:
 - **Optimistic save** → `useFetcher` renders the new note immediately and reconciles when the response lands.
 
 `tests/handlers.ts` is unchanged — every fetch still goes through MSW. The Stage 2–5 e2e tests pass against the migrated app because the role/label locators didn't move (the agent's first migration broke one — a wrapped `<form>` lost its accessible name; the regression check caught it and the fix was a one-liner).
-
-</details>
-
-<details>
-<summary>Background</summary>
-
-A routing framework enters. The network is still MSW. In dev, the app itself runs against the mock handlers — this means the prototype is *demoable* to real users before any backend exists. Existing tests don't change.
-
-- **Tech introduced:** a routing framework of your choice (menu below).
-- **Off-limits:** real backend, real database, auth provider. `tests/handlers.ts` is still the entire network layer.
-- **Narrations:** in Build, replace any narration whose behavior depends on framework features (loading states, route transitions, redirects, suspense boundaries, error boundaries, auth-gated routes, server-rendered initial state). Tests for them land in Add tests. Backend-dependent narrations stay.
-
-**Framework menu**
-
-No prescribed default — pick by what your app needs to do:
-
-- **Next.js App Router** — the most batteries-included option. Server components, image optimization, file-based routing, first-class Vercel deployment. Strong choice if you want minimal infrastructure decisions and Vercel-style hosting.
-- **React Router v7 (framework mode)** — closest to plain React, less opinionated. Strong choice if you want flexibility and a smaller surface area.
-- **TanStack Router** — newer, with route-level type safety better than either of the above. Strong choice if type-safe routing is the property you care most about.
-- **Astro (with React islands)** — content-first, hydrates interactivity selectively. Strong choice if most of your app is content with sprinkles of interaction.
-
-The only hard constraint: the framework migration must preserve accessible names. Your Stages 2–5 Playwright tests are anchored to roles and labels, not to component identities — if those don't move, the tests keep passing.
 
 </details>
 
@@ -861,6 +861,28 @@ Output:
 </details>
 
 <details>
+<summary>Background</summary>
+
+This is where the whole approach pays off. To land a real backend endpoint, I implement the route, **delete its handler from `tests/handlers.ts`**, and re-run the e2e suite. The handler removal is the cutover. The tests pass for the same reason they always did — the contract didn't change, just the implementation behind it. Backend lands one route at a time, and each landing is a one-line deletion from a file. Any backend-dependent narration still in the frontend is implemented alongside its corresponding route in this same iteration.
+
+- **Tech introduced:** a backend stack of your choice (menu below).
+- **Off-limits:** changing the network contract without flagging it. If the real backend would naturally have a different request/response shape than the existing MSW handler, stop and reconcile the contract first.
+- **Narrations:** any narration tied to this iteration's endpoint is implemented in Build; its test lands in Add tests. By the end of Stage 7, the narration count is zero.
+
+**Backend menu**
+
+No prescribed default — pick by where the app needs to run and how much infrastructure you want to operate:
+
+- **Self-hosted Node / Bun + ORM + DB** — a runtime (Node or Bun) plus a server framework (Hono, Elysia, Express, Fastify), an ORM (Drizzle, Prisma, Kysely), and a database (SQLite for local, Postgres for production). Full type safety end-to-end with React; full control over hosting and cost.
+- **Managed BaaS** — Convex, Supabase, Firebase. Auth + database + functions bundled. Convex is the most React-native (functions are TypeScript, queries are reactive by default). Supabase is the closest drop-in for "Postgres + auth + storage." Firebase has the best mobile story.
+- **Edge / serverless** — Cloudflare Workers, AWS Lambda, Vercel Functions, Deno Deploy. Pay-per-request, no servers to keep running. Strong choice if traffic is spiky or you don't want to operate infrastructure.
+- **Hybrid** — e.g., Supabase for auth + DB, Workers or Lambdas for heavier compute. The most common production pattern in practice.
+
+The contract you have to keep is whatever was in the MSW handler. Pick the backend that lets you preserve the request/response shape with the least ceremony, and you'll be replacing handlers one at a time without touching the frontend.
+
+</details>
+
+<details>
 <summary>Example</summary>
 
 The chat had landed on **Hono + Drizzle + SQLite** as the backend stack — easy to run locally, easy to swap SQLite → Postgres later without touching Drizzle code.
@@ -889,28 +911,6 @@ Stage 7's Add tests prompt ran the suite. Stages 2–6 e2e tests passed against 
 **Iteration 3: auth (`POST /api/signup`, `POST /api/login`, session cookie).** Coupled, so one iteration covered all three. The session-cookie change touched the route loaders from Stage 6; the suite caught one regression where the login redirect target was wrong, fixed in two lines.
 
 By the end of Stage 7, `tests/handlers.ts` contained only handlers for third-party services I don't own — those mark the permanent system boundary, not the migration backlog.
-
-</details>
-
-<details>
-<summary>Background</summary>
-
-This is where the whole approach pays off. To land a real backend endpoint, I implement the route, **delete its handler from `tests/handlers.ts`**, and re-run the e2e suite. The handler removal is the cutover. The tests pass for the same reason they always did — the contract didn't change, just the implementation behind it. Backend lands one route at a time, and each landing is a one-line deletion from a file. Any backend-dependent narration still in the frontend is implemented alongside its corresponding route in this same iteration.
-
-- **Tech introduced:** a backend stack of your choice (menu below).
-- **Off-limits:** changing the network contract without flagging it. If the real backend would naturally have a different request/response shape than the existing MSW handler, stop and reconcile the contract first.
-- **Narrations:** any narration tied to this iteration's endpoint is implemented in Build; its test lands in Add tests. By the end of Stage 7, the narration count is zero.
-
-**Backend menu**
-
-No prescribed default — pick by where the app needs to run and how much infrastructure you want to operate:
-
-- **Self-hosted Node / Bun + ORM + DB** — a runtime (Node or Bun) plus a server framework (Hono, Elysia, Express, Fastify), an ORM (Drizzle, Prisma, Kysely), and a database (SQLite for local, Postgres for production). Full type safety end-to-end with React; full control over hosting and cost.
-- **Managed BaaS** — Convex, Supabase, Firebase. Auth + database + functions bundled. Convex is the most React-native (functions are TypeScript, queries are reactive by default). Supabase is the closest drop-in for "Postgres + auth + storage." Firebase has the best mobile story.
-- **Edge / serverless** — Cloudflare Workers, AWS Lambda, Vercel Functions, Deno Deploy. Pay-per-request, no servers to keep running. Strong choice if traffic is spiky or you don't want to operate infrastructure.
-- **Hybrid** — e.g., Supabase for auth + DB, Workers or Lambdas for heavier compute. The most common production pattern in practice.
-
-The contract you have to keep is whatever was in the MSW handler. Pick the backend that lets you preserve the request/response shape with the least ceremony, and you'll be replacing handlers one at a time without touching the frontend.
 
 </details>
 
