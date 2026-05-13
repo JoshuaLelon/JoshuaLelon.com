@@ -16,9 +16,9 @@ I build apps in eight stages:
 
 | Stage | Summary | Tech introduced | Tests added |
 |---|---|---|---|
-| **1. HTML wireframe** | **Adds navigation**: static `.html` files linked with `<a>`s | HTML (Wireframe HTML subset) | Structural lint |
-| **2. Click-through prototype** | **Adds single-hop state**: minimum vanilla JS makes typed input observable on the next screen | inline `<script>` JS, Playwright. | One Playwright e2e per flow (role/label locators) |
-| **3. React + global state** | **Adds global state**[\*](#narrations): refactor wireframes into React components; hooks replace inline `<script>`s; state persists across screens | React, React hooks, a bundler (default: Vite) | Behaviors needing cross-screen state: in-memory lists, modal/dropdown toggles, client-side sorting/filtering |
+| **1. Click-through prototype** | **Adds navigation**: static `.html` files linked with `<a>`s | HTML (Wireframe HTML subset) | Structural lint |
+| **2. Custom-input prototype** | **Adds single-hop state**: minimum vanilla JS makes typed input observable on the next screen | inline `<script>` JS, Playwright. | One Playwright e2e per flow (role/label locators) |
+| **3. Stateful prototype** | **Adds global state**[\*](#narrations): refactor wireframes into React components; hooks replace inline `<script>`s; state persists across screens | React, React hooks, a bundler (default: Vite) | Behaviors needing cross-screen state: in-memory lists, modal/dropdown toggles, client-side sorting/filtering |
 | **4. Mocked network** | **Adds network**[\*](#narrations): MSW intercepts client fetches; "persisted" data can be loaded and saved via the mock seam | MSW, `fetch` in the app | Network-dependent behaviors: autosuggest, server errors, save-then-reload round trips |
 | **5. Styled mockup** | **Adds style**[\*](#narrations): Tailwind + shadcn/ui replace bare HTML; visual-fidelity narrations become real components | Tailwind, shadcn/ui | Regression check (role/label locators survive); tests for any visual-fidelity narrations implemented this stage |
 | **6. Full prototype with mocked backend** | **Adds routing**: framework enters; app runs against MSW handlers in dev — demoable to users without a backend | A routing framework of your choice. | Tests for the framework-dependent behaviors implemented this stage. |
@@ -29,9 +29,9 @@ I build apps in eight stages:
 
 - [Why bother with a process](#why-bother-with-a-process)
 - [The pipeline](#the-pipeline)
-  - [Stage 1: HTML wireframe](#stage-1-html-wireframe)
-  - [Stage 2: Click-through prototype](#stage-2-click-through-prototype)
-  - [Stage 3: React + global state](#stage-3-react--global-state)
+  - [Stage 1: Click-through prototype](#stage-1-click-through-prototype)
+  - [Stage 2: Custom-input prototype](#stage-2-custom-input-prototype)
+  - [Stage 3: Stateful prototype](#stage-3-stateful-prototype)
   - [Stage 4: Mocked network](#stage-4-mocked-network)
   - [Stage 5: Styled mockup](#stage-5-styled-mockup)
   - [Stage 6: Full prototype with mocked backend](#stage-6-full-prototype-with-mocked-backend)
@@ -52,7 +52,7 @@ I wanted a process where the tests grow with the product. Coarse at the start, g
 
 Stages 1–5 are the load-bearing part. They produce a tested, styled, fully-demoable prototype with mocked everything in hours, not days — the artifact you'd put in front of a real user before any backend exists. Stages 6–8 are the on-ramp from prototype to production: sketched with menu options rather than defaults, because the right choices there depend on what your app actually needs to do and where it'll live. The split into more stages than you might expect is deliberate — each stage is scope-locked to one architectural concern so the agent prompts can't drift, and so every change is small enough to validate with the e2e suite before the next one lands.
 
-### Stage 1: HTML wireframe
+### Stage 1: Click-through prototype
 
 A folder of static `.html` files, one per screen, linked with `<a href>`s. The cheapest possible artifact for arguing about the *flow*. Static HTML beats Figma here because you can actually navigate it — you click through and feel whether the flow is right. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post for the framing.) If the flow is wrong, you'd rather discover it now than after you've wired up state management.
 
@@ -169,7 +169,7 @@ Output:
 - Example run output showing the assertions passing and the narration count.
 ```
 
-### Stage 2: Click-through prototype
+### Stage 2: Custom-input prototype
 
 Once a flow feels right, the wireframe gets the minimum vanilla JavaScript that makes it *behaviorally testable*: inline `<script>` blocks that intercept form submits and render the next screen with typed values carried forward. That single capability — **user input becomes observable to the next screen** — is what unlocks the first real Playwright assertion. A test can now type into *Title*, click Submit, and verify the typed value appears as a heading on the next page:
 
@@ -248,7 +248,7 @@ Output:
 - All tests pass when I run `npx playwright test`. Existing structural lint still passes.
 ```
 
-### Stage 3: React + global state
+### Stage 3: Stateful prototype
 
 This is where React enters and the state model jumps a level. Stage 2 was single-hop (one form → one destination, then gone); Stage 3 is the first stage with anything **global-ish**. The inline `<script>` blocks become real components; React hooks (`useState`, `useReducer`, `useContext`) hold in-memory state at the component or context level. Values become referenceable from anywhere in the app, mutable, displayable in multiple places — which is what unlocks lists, filters, inline editing, and any cross-screen invariant the tests want to assert. There's no network yet, and no styling yet either. The artifact at the end of this stage is ugly but stateful.
 
