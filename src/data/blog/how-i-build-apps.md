@@ -117,10 +117,49 @@ Output:
 **Steps:**
 
 1. Make sure you've run the [Setup](#setup) prompt first — the rest of these steps assume the project scaffold is in place.
-2. Tell the AI in chat about the app you want to build — what it does, who it's for, the main flows.
+2. Tell the AI in chat about the app you want to build — what it does, who it's for, the main flows. **Optional:** if you'd rather be interviewed than dictate, paste the **Interview prompt** below and answer one question at a time.
 3. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
 4. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
 5. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves, every narration is tagged.
+
+<details>
+<summary>Interview prompt (optional)</summary>
+
+```
+You are interviewing me to help me discover and articulate the shape of the app I want to build. The output is a tight, written spec the rest of this chat can rely on when I paste later-stage prompts.
+
+Rules for the interview:
+
+1. Ask ONE QUESTION AT A TIME. Wait for my answer. Then ask the next.
+2. Start broad ("what's the app for?") and narrow in based on what I say. If I give a vague answer, push back gently and ask a more specific follow-up before moving on.
+3. Don't dump a numbered list of questions on me. Conversational, one beat at a time.
+4. Cover this ground before finishing, in roughly this order — skip anything I've already answered:
+   - One-sentence purpose of the app (the value to the user)
+   - Primary user (one persona is enough — who they are, what their day looks like, why they'd reach for this)
+   - The single most important thing they do with it (the core flow that has to work)
+   - 3–5 supporting flows (sign-up / auth, settings, sharing, delete-account, etc.)
+   - Data shape the app holds (free-form text, structured records, lists, files, relations)
+   - Auth / privacy posture (single-user local, multi-user with accounts, public read, etc.)
+   - Scale that matters for v1 (just me, ~10 friends, ~10k users, offline-capable, etc.)
+   - Inspirations — apps I like and want this to feel similar to
+   - Explicit non-goals for v1 (what we are NOT building yet)
+5. After enough exchanges — usually 8 to 12 — STOP and produce a SPEC SUMMARY in this exact format:
+
+   ## App spec
+   - **One-liner:** ...
+   - **Primary user:** ...
+   - **Core flow (must work):** ...
+   - **Supporting flows:** [list]
+   - **Data shape:** [brief]
+   - **Auth / privacy:** [single-user / multi-user / public]
+   - **Scale (v1):** [target]
+   - **Inspirations:** [list, or "none"]
+   - **Out of scope for v1:** [list]
+
+6. Ask me to confirm or correct the spec. Once I confirm, the spec is the source of truth for the rest of this chat — when I paste the Stage 1 Build prompt later, treat "the web app we just discussed" as a reference to this spec.
+```
+
+</details>
 
 <details>
 <summary>Build prompt</summary>
