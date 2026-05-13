@@ -61,7 +61,7 @@ I'd love to write that playbook right now, but it'd be too time-consuming, and I
 
 The two keys are:
 1. baking in tests from the very beginning, and
-2. having a process that's legible to business, design, and engineering.
+2. having a process that's legible to business, design, and engineering at any point.
 
 Any app with more than three or four screens has enough surface area that you lose track. Even at the demo stage, you can't hold the whole flow in your head. As you're vibe-coding, regressions stay invisible until you happen to stumble through that exact path. 
 
@@ -71,9 +71,9 @@ Business people have their powerpoints and user stories. Design has their figma 
 
 But now that businesses, design, etc are becoming more AI-forward, it makes a lot more sense to create a source of truth for UI flows that AI can examine.
 
-Playwright e2e tests can act as that source of truth. For the engineer as they build the app and for the app's stakeholders.
+Playwright e2e tests can act as that searchable source of truth. For the engineer as they build the app and for the app's stakeholders to ask questions about.
 
-So, I created a process where tests are there from the very beginning and grow with the product. They're coarse at the start and become more granular when the shape stabilizes. Having a process means the overhead is minimal enough at every stage that there's no excuse to skip them.
+So, I created a process where tests are there from the very beginning and grow with the product. They're coarse at the start and become more granular when the shape stabilizes. The overhead is minimal enough at every stage that there's no excuse to skip them.
 
 That's what this pipeline is.
 
