@@ -61,6 +61,13 @@ Generate static HTML wireframes — one file per screen, linked with `<a href>`s
 |---|---|---|
 | HTML (Wireframe HTML subset); Node + HTML parser | Static HTML wireframes; clickable links between screens | Authored here (not replaced) |
 
+**Steps:**
+
+1. Tell the AI in chat about the app you want to build — what it does, who it's for, the main flows.
+2. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
+3. Paste the **Add tests prompt**. The agent generates a structural lint at `tests/wireframe-lint.mjs`.
+4. Run `npm run lint:wireframe` — every input has a label, every SVG has a title, every `<a href>` resolves.
+
 <details>
 <summary>Build prompt</summary>
 
@@ -235,6 +242,12 @@ Add the minimum vanilla JavaScript so typed input flows to the next screen.
 |---|---|---|
 | Vanilla JS (inline `<script>`); Playwright | Wireframes where typed input renders on the next screen | None — narrations stay in place |
 
+**Steps:**
+
+1. Paste the **Build prompt**. The agent adds inline `<script>` to each form so typed values flow to the next screen.
+2. Paste the **Add tests prompt**. The agent writes one Playwright e2e per flow at `tests/e2e/`.
+3. Run `npx playwright test` — every flow's happy path passes; the structural lint from Stage 1 stays green.
+
 <details>
 <summary>Build prompt</summary>
 
@@ -370,6 +383,12 @@ Refactor wireframes into React components with hooks for state.
 |---|---|---|
 | React, React hooks, Vite (or your bundler) | React app with global-ish state; unstyled | State-only |
 
+**Steps:**
+
+1. Paste the **Build prompt**. The agent refactors the wireframes into React components with hooks for state, and replaces any state-only narrations.
+2. Paste the **Add tests prompt**. The agent writes a Playwright e2e for each replaced narration.
+3. Run the full suite — structural lint + Stage 2 e2e + the new tests all pass.
+
 <details>
 <summary>Build prompt</summary>
 
@@ -487,6 +506,12 @@ Add MSW; wire up `fetch` calls for network-dependent behaviors.
 |---|---|---|
 | MSW; `fetch` in the app | React app with mocked network; persisted-feel behaviors work | Network-dependent |
 
+**Steps:**
+
+1. Paste the **Build prompt**. The agent adds MSW, wires `fetch` calls in the app, and replaces network-dependent narrations.
+2. Paste the **Add tests prompt**. The agent writes Playwright tests using `network.use(...)` for per-test scenarios (empty list, error response, populated suggestions).
+3. Run the full suite — Stages 2–3 e2e + the new tests all pass; structural lint stays green.
+
 <details>
 <summary>Build prompt</summary>
 
@@ -599,6 +624,12 @@ Apply Tailwind + shadcn/ui across the components.
 |---|---|---|
 | Tailwind, shadcn/ui | Styled, polished React app — looks like an app | Style-only |
 
+**Steps:**
+
+1. Paste the **Build prompt**. The agent adopts Tailwind + shadcn/ui across the components, replaces style-only narrations, and preserves accessible names.
+2. Paste the **Add tests prompt**. Mostly a regression check — confirm every role/label locator from Stages 2–4 still resolves. Add new tests only for style behaviors that are independently testable.
+3. Run the full suite. Any failure is almost always a wrapped element that lost its role; fix the markup, not the test.
+
 <details>
 <summary>Build prompt</summary>
 
@@ -693,6 +724,13 @@ Migrate the prototype onto a routing framework of your choice.
 | Tech | Output | Narrations addressed |
 |---|---|---|
 | A routing framework of your choice (menu in Background) | Framework-routed app; still MSW-backed; demoable | Framework-dependent |
+
+**Steps:**
+
+1. Pick a routing framework with the AI in chat — the Background's **Framework menu** is your reference if you haven't decided.
+2. Paste the **Build prompt**. The agent migrates the components into framework routes and replaces framework-dependent narrations.
+3. Paste the **Add tests prompt**. The agent writes Playwright tests for the new routing behaviors (loading states, redirects, auth gates).
+4. Run the full suite — Stages 2–5 e2e tests still pass against the migrated app.
 
 <details>
 <summary>Build prompt</summary>
@@ -807,6 +845,14 @@ Replace one MSW handler with a real backend route. Repeat.
 | Tech | Output | Narrations addressed |
 |---|---|---|
 | A backend stack of your choice (menu in Background) | Real backend behind one route; rest still MSW | Backend-dependent |
+
+**Steps (repeat per handler):**
+
+1. Pick a backend stack with the AI in chat — the Background's **Backend menu** is your reference if you haven't decided.
+2. Pick the next handler from `tests/handlers.ts` to migrate. Typically the one blocking the most user flows from working against real data.
+3. Paste the **Build prompt**. The agent implements the real route with the same request/response shape, deletes the corresponding MSW handler, and (if any narration is tied to it) replaces it with real UI.
+4. Paste the **Add tests prompt**. The agent runs the existing suite against the new mix of real backend + remaining MSW; adds a test for any narration that landed.
+5. Repeat steps 2–4 until `tests/handlers.ts` contains only third-party services.
 
 <details>
 <summary>Build prompt</summary>
