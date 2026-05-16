@@ -63,6 +63,8 @@ The two keys are:
 1. baking in tests from the very beginning, and
 2. having a process that's legible to business, design, and engineering at any point.
 
+The other thing AI demos under-sell is that the prototype has to *communicate* the idea before it gets built. You're pitching yourself, your collaborators, sometimes an investor. A wireframe you can click through is the cheapest medium that does both jobs at once — sells the idea now, becomes the spec the rest of the pipeline consumes later. Most artifacts only do one or the other: a Figma sells but doesn't build; a half-coded prototype builds but only lives in your head. Static HTML with narrations does both.
+
 Any app with more than three or four screens has enough surface area that you lose track. Even at the demo stage, you can't hold the whole flow in your head. As you're vibe-coding, regressions stay invisible until you happen to stumble through that exact path. 
 
 And even if you could hold it all in your head, it's hard to communicate to your broader team at scale.
@@ -227,16 +229,21 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
    ````
    You are sketching wireframes for the web app we just discussed, in small bounded iterations. Each iteration adds or changes about FIVE things and then STOPS. The first iteration is the most primitive — it might not even contain per-screen .html files yet, just a flow sketch.
 
+   Mental model — narrations are the unit of description:
+   - At iteration 1 the wireframe is mostly narrations. You haven't built any UI yet, so each screen is a one-sentence description of what it shows or lets the user do, wrapped in an <aside class="narration BUCKET"> (rules below). Most of those will be `backend` at first, since "the list of X is shown" or "X is saved" implies a server. Some will be `framework` (loading state on first paint, redirect after submit) or `state` (this opens a modal). A few might already be expressible as plain HTML (a static heading, a hard-coded `<a href>` to the next screen) — write those as plain HTML, no narration needed.
+   - Subsequent iterations convert narrations into static HTML wherever static HTML can express the thing — replace a "lets the user type a title and submit" narration with a real `<label>` + `<input>` + `<button>`. Narrations that can't yet be replaced stay in place, tagged with the bucket of the stage that will replace them later.
+   - The pipeline is one long narration-replacement loop. The wireframe gradient is: words → narration → narration with concrete HTML around it → all-HTML-with-tests. Stage 1 takes you most of the way; Stages 3–7 finish the job.
+
    Iteration 1 — primary value flow only:
    - Ask me 1–2 questions you need to know to start, scoped to the PRIMARY VALUE FLOW only (the one or two screens that deliver the core thing this app is for). Do NOT ask about signup, auth, settings, sharing, account management, or any supporting flow yet — those come later, only when I name them.
-   - Once I've answered, produce a single index.html. It is the cheapest possible representation of the primary value flow: a numbered or bulleted list of screen names with a one-sentence description of each, the arrows between them shown either as <a href="#screen-id"> links to in-page anchors or as a short inline <svg> diagram. About 5 list items / arrows total. No per-screen .html files yet.
-   - Add narrations for anything beyond static HTML's reach at the point in the sketch where it would happen, tagged with the bucket of the future stage that will replace them (rules below).
+   - Once I've answered, produce a single index.html. It is the cheapest possible representation of the primary value flow: a numbered or bulleted list where each item is a screen name + a one-sentence description in an `<aside class="narration BUCKET">` (mostly `backend`, sometimes `framework`/`state`), and the arrows between screens are `<a href="#screen-id">` links to in-page anchors or a short inline `<svg>` diagram. About 5 items total. No per-screen .html files yet — those land only when I ask for them.
    - Print a one-line summary of the ~5 things you produced. Then STOP and ask what to add or change next.
 
    Subsequent iterations — wait for me to name what to do, then do exactly that:
-   - I will say things like "expand screen 2 into its own page", "add a tags input to screen 3", "rename screen 4 to X", "add the signup flow", "drop the share-modal narration on screen 5", "combine screens 2 and 3". Make about 5 additions or changes that match what I named. Nothing more.
+   - I will say things like "expand screen 2 into its own page", "replace the search narration on screen 1 with a real input + button", "add a tags field to screen 3", "rename screen 4 to X", "add the signup flow", "combine screens 2 and 3". Make about 5 additions or changes that match what I named. Nothing more.
+   - The most common move is **converting a narration into static HTML**. When I name a narration to "make real," replace the `<aside>` with the equivalent `<label>` / `<input>` / `<button>` / `<a href>` / `<form>` and leave only the residual narration (e.g. the network round-trip behind a Save button stays as a `network` narration even after the button itself becomes real).
    - Do NOT add a screen, flow, element, or narration I have not named or explicitly authorized. If you think something is obviously missing, ASK before adding it; do not add it preemptively.
-   - Common iteration moves (only execute when I name them): turn a list item in index.html into its own <screen>.html; add inputs/buttons/SVGs to an existing screen; rewrite a narration to be more specific; combine two screens; split one into two; lift a supporting flow (signup, settings, share) in once the primary value flow feels right.
+   - Common iteration moves (only execute when I name them): turn a list item in index.html into its own `<screen>.html`; convert a narration to real HTML; add inputs/buttons/SVGs to an existing screen; rewrite a narration to be more specific; combine two screens; split one into two; lift a supporting flow (signup, settings, share) in once the primary value flow feels right.
    - After each iteration, print a one-line summary of what you changed and STOP. Ask what's next. Do NOT continue past one round on your own.
 
    Constraints — strict (apply to every iteration):
@@ -339,12 +346,14 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
 <details>
 <summary>Background</summary>
 
-At this point, it's a folder of static `.html` files, one per screen, linked with `<a href>`s. The cheapest possible artifact for establishing the *flow*. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post.)
+At this point, it's a folder of static `.html` files, one per screen, linked with `<a href>`s. The cheapest possible artifact for establishing the *flow*. (Credit to Thariq's [HTML effectiveness](https://thariqs.github.io/html-effectiveness/) post — he makes the broader case that self-contained HTML beats markdown for any AI-collaboration artifact because it trades a document you'd skim for one you'd actually use.)
+
+The wireframe is doing two jobs at once: it's the thing you (and anyone you're pitching) click through to *get* the idea, and it's the spec the rest of the pipeline consumes. Narrations are what lets those two jobs coexist — even behavior you can't render yet is described precisely enough that a reader walking the flow still feels what happens at each point, and a future stage still has something specific to implement.
 
 <details>
 <summary>About Narrations</summary>
 
-At Stage 1 you can't express animation, async state, real-time updates, drag interactions, or anything time-dependent in pure static HTML. Rather than skip those parts of the flow or fake-stub them with broken UI, render them as **narration blocks** — and tag each one with its **bucket** so later stages know which to pick up:
+Narrations are the **unit of description** that runs through the whole pipeline. They are not an escape hatch — they are how the wireframe expresses behavior *before* the corresponding HTML, React, network, or backend exists to render it. At iteration 1 the wireframe is mostly narrations, because you haven't built any UI yet; you just have screens with descriptions of what they show and what the user can do. Subsequent iterations convert narrations into static HTML wherever static HTML can express the thing (a button, a form, an `<a href>`); narrations that can't yet be replaced — animation, async state, real-time updates, drag, persistence, routing — stay in place, tagged with the bucket of the future stage that *will* replace them:
 
 ```html
 <aside class="narration style">
@@ -367,7 +376,7 @@ Narrations sort into five buckets, each handled by a different stage. The pair s
 - **Framework-dependent narrations** *(`framework`, "Framework —")* — behaviors needing a routing framework: route transitions, loading states tied to navigation, redirects after form submission, auth-gated routes, server-rendered initial state. **Stage 6** picks these off.
 - **Backend-dependent narrations** *(`backend`, "Backend —")* — behaviors needing a real server: persistence across page reloads, real auth sessions, real-time server events, anything where the server's actual response shapes behavior (rate limits, conflict resolution, etc.). **Stage 7** picks these off, one route at a time.
 
-By the end of Stage 7, every narration has been replaced. The count of remaining narrations is a visible progress indicator.
+By the end of Stage 7, every narration has been replaced. The count of remaining narrations is a visible progress indicator — it falls monotonically from "almost everything" at Stage 1 iteration 1 to zero at Stage 7's last route. The lint already reports per-file and per-bucket counts on every run, so you can watch the gradient.
 
 </details>
 
@@ -385,7 +394,7 @@ A strict subset of HTML is sufficient to describe the flow of any app, given tha
 - **Dialogs:** `<dialog open>` — native modal, kept in the always-open state for wireframing.
 - **Links:** `<a href>` — the only legal way to move between screens.
 - **Forms:** `<form>`, `<fieldset>`, `<legend>`, `<label for>`, `<input>` (types `text`, `email`, `password`, `number`, `tel`, `url`, `search`, `date`, `checkbox`, `radio`, `hidden`, `submit`), `<textarea>`, `<select>`, `<option>`, `<button>`.
-- **SVG diagrams:** inline `<svg>` with `<title>` (required — it's the accessible name a test will locate by), `<desc>`, and the core shape children `<g>`, `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`, `<path>`, `<text>`. Use this for icons, arrows, status indicators, flow diagrams, simple charts — anything the agent can express as shapes.
+- **SVG diagrams:** inline `<svg>` with `<title>` (required — it's the accessible name a test will locate by), `<desc>`, and the core shape children `<g>`, `<rect>`, `<circle>`, `<ellipse>`, `<line>`, `<polyline>`, `<polygon>`, `<path>`, `<text>`. Inline SVG gives the agent a real pen — use it for icons, arrows, status indicators, flow diagrams, simple charts, anything the agent can express as shapes.
 - **The escape hatch:** `<aside class="narration BUCKET">` where `BUCKET` is one of `state`, `network`, `style`, `framework`, `backend` — see the Narrations subsection above for the tagging rules.
 
 </details>
