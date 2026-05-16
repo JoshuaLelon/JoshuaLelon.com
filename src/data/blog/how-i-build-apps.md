@@ -238,7 +238,7 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
      - Scaffold: <!doctype html>, <html>, <head>, <title>, <body>
      - Regions: <main>, <header>, <footer>, <nav>, <section>, <article>
      - Headings: <h1>–<h6>
-     - Text & lists: <p>, <ul>, <ol>, <li>
+     - Text & lists: <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>
      - Tables: <table>, <thead>, <tbody>, <tr>, <th>, <td>
      - Disclosure: <details>, <summary>
      - Dialogs: <dialog open>
@@ -368,7 +368,7 @@ A strict subset of HTML is sufficient to describe the flow of any app, given tha
 - **Document scaffold:** `<!doctype html>`, `<html>`, `<head>`, `<title>`, `<body>`.
 - **Regions:** `<main>`, `<header>`, `<footer>`, `<nav>`, `<section>`, `<article>` — landmark elements.
 - **Headings:** `<h1>`–`<h6>`.
-- **Text & lists:** `<p>`, `<ul>`, `<ol>`, `<li>`.
+- **Text & lists:** `<p>`, `<ul>`, `<ol>`, `<li>`, `<strong>`, `<em>`, `<code>`.
 - **Tables:** `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>`, `<td>`.
 - **Disclosure:** `<details>`, `<summary>` — native expand/collapse, no JS required.
 - **Dialogs:** `<dialog open>` — native modal, kept in the always-open state for wireframing.
