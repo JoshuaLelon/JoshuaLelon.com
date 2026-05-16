@@ -122,11 +122,11 @@ Steps — once I've answered, do them in order:
    - Write package.json using the project name I gave you; default the rest (description empty, author empty, license MIT, ESM module type).
    - `git init` and write a sensible .gitignore for Node + Vite + Playwright (include at least: node_modules, dist, test-results, playwright-report, .env, .DS_Store).
 
-2. Install dependencies at LATEST STABLE versions. Your training data is likely months or years stale, so don't trust remembered version numbers. For each package below, run `npm view <pkg> version` to discover the current latest, then install with the explicit `@latest` tag (e.g. `npm install -D @playwright/test@latest`) so npm resolves freshly rather than falling back to anything cached.
+2. Install dependencies at LATEST STABLE versions. Your training data is likely months or years stale, so don't trust remembered version numbers OR remembered install/setup idioms. For each package below, run `npm view <pkg> version` to discover the current latest, then install with the explicit `@latest` tag (e.g. `npm install -D @playwright/test@latest`) so npm resolves freshly rather than falling back to anything cached. For any tool whose install/setup idiom may have shifted in the last ~18 months (Tailwind, ESLint, shadcn, anything with a recent major version bump), pull fresh docs (e.g. via Context7 or the official site) before scaffolding configs — the package name may still be the same while the recipe has changed underneath.
    - Locked-in test tools (devDependencies): @playwright/test, msw
    - HTML parser for the Stage 1 lint (devDependencies): node-html-parser
    - Default runtime + bundler: react, react-dom (dependencies); @vitejs/plugin-react, vite (devDependencies)
-   - Default styling (devDependencies, only set up the configs — actual class usage starts at Stage 5): tailwindcss, postcss, autoprefixer
+   - Default styling (devDependencies): tailwindcss, @tailwindcss/vite. The Vite plugin gets wired in vite.config.ts now; actual class usage and the CSS entry file start at Stage 5.
    - TypeScript (devDependencies): typescript, @types/react, @types/react-dom, @types/node
 
 3. Download Playwright browser binaries:
@@ -134,8 +134,7 @@ Steps — once I've answered, do them in order:
 
 4. Scaffold minimal configs. Keep each file as small as possible — only what the pipeline needs:
    - tsconfig.json — strict React + ESM settings
-   - vite.config.ts — wires @vitejs/plugin-react
-   - tailwind.config.js + postcss.config.js — empty content paths for now (Stage 5 will populate)
+   - vite.config.ts — wires @vitejs/plugin-react and @tailwindcss/vite (Tailwind v4 is CSS-first; there's no separate tailwind.config.js or postcss.config.js to scaffold)
    - playwright.config.ts — leave the webServer entry as a placeholder I'll fill in at Stage 2
    - package.json scripts: dev (vite), build (vite build), test:e2e (playwright test), lint:wireframe (node tests/wireframe-lint.mjs — script file lands at Stage 1)
    - Empty tests/ directory
@@ -871,10 +870,10 @@ Slide-up animation (Stage 5) and route transitions (Stage 6) stay narrated.
    ```
    You are styling a working React app with mocked-network behaviors. The app's behavior is already complete; this stage is the visual layer.
 
-   Tailwind is already installed and the config files are in place from Setup — start using utilities directly. shadcn/ui isn't installed yet; initialize it with `npx shadcn@latest init` and add components as you need them.
+   Tailwind v4 is installed and the @tailwindcss/vite plugin is wired in vite.config.ts (from Setup). Create the CSS entry file with `@import "tailwindcss";` (typically src/index.css), import it once from your app entry, and start using utilities directly. No tailwind.config.js or postcss.config.js — v4 is CSS-first; theme tokens, if you need any, go in an `@theme {}` block in the CSS entry. shadcn/ui isn't installed yet; initialize it with `npx shadcn@latest init` and add components as you need them.
 
    You will introduce:
-   - **Tailwind CSS** for utility-class styling. (Swap: vanilla CSS modules, Open Props, Pico.css, or another approach — uninstall tailwindcss / postcss / autoprefixer first.)
+   - **Tailwind CSS** for utility-class styling. (Swap: vanilla CSS modules, Open Props, Pico.css, or another approach — uninstall tailwindcss / @tailwindcss/vite first.)
    - **shadcn/ui** for component primitives (Button, Dialog, DropdownMenu, Toast, etc.). (Swap: another component library, or roll your own — but ensure the replacement preserves the ARIA roles emitted by the underlying HTML so the existing Playwright tests keep finding their locators.)
 
    Still OFF-LIMITS — strict:
