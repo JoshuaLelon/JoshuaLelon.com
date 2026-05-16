@@ -93,6 +93,22 @@ A one-time install before Stage 1. The seven stages all assume you have a projec
 ```
 You are setting up the project scaffold I'll use across all seven stages of the build pipeline. Defaults: React + Vite + Tailwind + shadcn-style components, Playwright + MSW for tests, an HTML parser for Stage 1's structural lint.
 
+Pipeline context — read this before doing anything else:
+
+This Setup prompt is Step 0 of a seven-stage pipeline. Each later stage adds exactly one capability and the tests for it:
+
+  1. Click-through prototype — static .html files linked with <a href>s; structural lint.
+  2. Custom-input prototype — inline <script> so typed input flows forward; one Playwright e2e per flow.
+  3. Stateful prototype — React + hooks (replaces `state` narrations).
+  4. Mocked network — MSW intercepts fetches (replaces `network` narrations).
+  5. Styled mockup — Tailwind + shadcn/ui (replaces `style` narrations).
+  6. Full prototype, mocked — routing framework (replaces `framework` narrations).
+  7. Real backend, route-by-route — each route replaces an MSW handler (replaces `backend` narrations).
+
+The load-bearing concept is **narrations**. At Stage 1, any behavior beyond static HTML — including all backend work — gets captured as an `<aside class="narration BUCKET">` at the exact point in the UI where it would trigger, where BUCKET is one of: state, network, style, framework, backend. Each later stage picks off its bucket. By the end of Stage 7 every narration has been replaced.
+
+This is how architectural decisions get deferred. Backend stack, language choice (Python vs Node, etc.), storage flavor, monorepo layout, service splits, "let's add an engine workspace" — all of it lives as `backend` narrations until Stage 7 says it's time to pick them off. Playwright and MSW are locked in (their locator/contract surfaces survive every rewrite). The default stack (React + Vite + Tailwind + shadcn-style) is swappable at the relevant stage.
+
 Step 0 — confirm where you're working:
 - Print your current working directory.
 - Ask me to confirm this is where I want the project to live. If I say no, wait until I `cd` to the right place (and tell you to start over) before doing anything else.
@@ -130,6 +146,23 @@ Output:
 - The project shell at the project name I gave you, ready for me to start Stage 1.
 - A short README.md naming each npm script and one-liner usage.
 - Print the resolved versions for every package you installed (the actual versions npm fetched, not what you remembered) so I have a record.
+
+After Setup — what to do and NOT do:
+
+Finish Setup, report the output, then STOP. Do NOT start Stage 1 on your own.
+
+If I describe my app idea in chat next:
+
+Do:
+- Reflect what you heard back in 2–3 sentences.
+- Ask clarifying questions about user-facing flows only (what screens, what the user sees, what they click).
+- Ask whether I want to paste the Stage 1 Interview prompt or jump to the Stage 1 Build prompt.
+
+Do NOT:
+- Propose backend architecture, language choices, monorepo layouts, vector stores, service splits, or "let's add an engine workspace." Those decisions live as `backend` narrations until Stage 7.
+- Start writing .html files or React components before I paste the Stage 1 Build prompt.
+
+The instinct to architect early is the failure mode this pipeline corrects. If you feel that instinct, that's the signal the thing belongs in a `backend` narration at Stage 1.
 ```
 
 </details>
