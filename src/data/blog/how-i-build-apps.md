@@ -235,7 +235,7 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
    - NO JavaScript. NO frameworks. NO component libraries. NO build step. NO package.json. NO tests.
    - Exactly ONE CSS file is allowed: narrations.css, holding only the color-coding rules for narration asides (see Narration tagging below). NO other CSS.
    - Allowed HTML elements only (the "Wireframe HTML" subset):
-     - Scaffold: <!doctype html>, <html>, <head>, <title>, <body>
+     - Scaffold: <!doctype html>, <html>, <head>, <meta charset="utf-8">, <title>, <body>
      - Regions: <main>, <header>, <footer>, <nav>, <section>, <article>
      - Headings: <h1>–<h6>
      - Text & lists: <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>
@@ -310,6 +310,7 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
    3. Every .html file has exactly one <h1>. Heading levels within a file do not skip (i.e. no <h3> appears before any <h2> within the same document).
    4. Every <a href="..."> pointing to a relative path resolves to an existing file in the wireframe folder.
    5. Every <aside class="narration ..."> carries exactly one bucket class from {state, network, style, framework, backend} AND its first child is a <strong> whose text matches the bucket exactly: "State-only —", "Network —", "Style —", "Framework —", or "Backend —". (Catches taxonomy drift early.)
+   6. Every .html file has a <meta charset="utf-8"> inside <head>. (Without it, em-dashes and other non-ASCII characters render as mojibake.)
 
    Tracked metrics — report but do not fail on:
    - Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
@@ -365,7 +366,7 @@ By the end of Stage 7, every narration has been replaced. The count of remaining
 
 A strict subset of HTML is sufficient to describe the flow of any app, given that narrations are the escape hatch. The rule for inclusion is one question: *does this element create a stable role-or-label locator a future Playwright test could target?* If yes, it's in. If no, it's a narration.
 
-- **Document scaffold:** `<!doctype html>`, `<html>`, `<head>`, `<title>`, `<body>`.
+- **Document scaffold:** `<!doctype html>`, `<html>`, `<head>`, `<meta charset="utf-8">` (required — without it, em-dashes and other Unicode render as mojibake), `<title>`, `<body>`.
 - **Regions:** `<main>`, `<header>`, `<footer>`, `<nav>`, `<section>`, `<article>` — landmark elements.
 - **Headings:** `<h1>`–`<h6>`.
 - **Text & lists:** `<p>`, `<ul>`, `<ol>`, `<li>`, `<strong>`, `<em>`, `<code>`.
