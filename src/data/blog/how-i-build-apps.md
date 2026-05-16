@@ -106,7 +106,7 @@ Steps — once I've answered, do them in order:
 
 2. Install dependencies at LATEST STABLE versions. Your training data is likely months or years stale, so don't trust remembered version numbers. For each package below, run `npm view <pkg> version` to discover the current latest, then install with the explicit `@latest` tag (e.g. `npm install -D @playwright/test@latest`) so npm resolves freshly rather than falling back to anything cached.
    - Locked-in test tools (devDependencies): @playwright/test, msw
-   - HTML parser for the Stage 1 lint (devDependencies): node-html-parser (or pick cheerio / linkedom — your call, just one)
+   - HTML parser for the Stage 1 lint (devDependencies): node-html-parser
    - Default runtime + bundler: react, react-dom (dependencies); @vitejs/plugin-react, vite (devDependencies)
    - Default styling (devDependencies, only set up the configs — actual class usage starts at Stage 5): tailwindcss, postcss, autoprefixer
    - TypeScript (devDependencies): typescript, @types/react, @types/react-dom, @types/node
@@ -130,7 +130,6 @@ Output:
 - The project shell at the project name I gave you, ready for me to start Stage 1.
 - A short README.md naming each npm script and one-liner usage.
 - Print the resolved versions for every package you installed (the actual versions npm fetched, not what you remembered) so I have a record.
-- Tell me which HTML parser you picked and why.
 ```
 
 </details>
@@ -269,7 +268,7 @@ Output:
    Constraints — strict:
    - Pure static analysis. NO browser, NO Playwright, NO server, NO running JavaScript from the wireframes.
    - Use a single Node script: tests/wireframe-lint.mjs.
-   - Pick any HTML parser of your choice (e.g. node-html-parser, cheerio, linkedom).
+   - Use node-html-parser (already installed at Setup).
    - Exit code 0 on pass, non-zero on fail.
 
    Assertions — must all pass:
@@ -282,7 +281,7 @@ Output:
    Tracked metrics — report but do not fail on:
    - Count of <aside class="narration"> blocks per file and per bucket across the wireframe.
 
-   Delegate the script writing to a subagent so the parent chat doesn't carry the parser-specific implementation in context. Pass it: the five assertions above, the bucket-class + bold-prefix rule from Stage 1's Narrations spec, and your choice of HTML parser. The parent only verifies the script exits 0 against the current wireframe.
+   Delegate the script writing to a subagent so the parent chat doesn't carry the parser-specific implementation in context. Pass it: the five assertions above, the bucket-class + bold-prefix rule from Stage 1's Narrations spec, and the parser (node-html-parser). The parent only verifies the script exits 0 against the current wireframe.
 
    Output:
    - tests/wireframe-lint.mjs (the script). The `lint:wireframe` package.json script already exists from Setup.
@@ -697,7 +696,7 @@ Three narrations still in place: slide-up + toast (Stage 5), autosuggest tags (S
 
    You will introduce:
    - **MSW** for mocking all network calls (locked in — do not swap). Default handlers go in `tests/handlers.ts` and are loaded by both the dev server and the Playwright test setup.
-   - **`fetch` calls** (or a thin wrapper of your choice — TanStack Query, swr, or vanilla — pick one) at the points in the app that need "persisted" data or server interaction.
+   - **Vanilla `fetch` calls** at the points in the app that need "persisted" data or server interaction. No wrapper library (TanStack Query, swr, etc.) — they can be added later if a narration needs caching, dedup, or background refetch.
 
    Still OFF-LIMITS — strict:
    - No CSS, no Tailwind, no component library. Default browser rendering only.
@@ -766,7 +765,7 @@ MSW is the second of the two locked-in tools. Intercepting at the network layer 
 <details>
 <summary>Example</summary>
 
-Stage 4's Build prompt added MSW and four handlers. The agent suggested using TanStack Query for fetch ergonomics; I declined for this iteration (vanilla `fetch` + `useEffect` is enough for now, and one less dependency to learn).
+Stage 4's Build prompt added MSW and four handlers. Vanilla `fetch` + `useEffect` is enough at this stage — one less dependency to learn, and a wrapper like TanStack Query or swr is easy to drop in later if a future narration needs caching or background refetch.
 
 `tests/handlers.ts` ended up as:
 
