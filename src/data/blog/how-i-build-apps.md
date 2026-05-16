@@ -219,18 +219,28 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
 
    </details>
 
-3. Paste the **Build prompt**. The agent generates static HTML wireframes; iterate with it until the flow feels right.
+3. Paste the **Build prompt**. The agent asks 1–2 setup questions, then produces a tiny flow sketch of the **primary value flow only** (no signup, settings, sharing, etc. yet). After each round — about 5 additions or changes — it stops and waits for you to name what's next. Iterate until the wireframe feels right.
 
    <details>
    <summary>Build prompt</summary>
 
    ````
-   You are wireframing the web app we just discussed.
+   You are sketching wireframes for the web app we just discussed, in small bounded iterations. Each iteration adds or changes about FIVE things and then STOPS. The first iteration is the most primitive — it might not even contain per-screen .html files yet, just a flow sketch.
 
-   Cover the core flows: the primary value flow plus the supporting flows (sign-up / auth, settings, etc.) that the app needs. If a flow we haven't talked about yet should obviously exist, propose it inline and continue.
+   Iteration 1 — primary value flow only:
+   - Ask me 1–2 questions you need to know to start, scoped to the PRIMARY VALUE FLOW only (the one or two screens that deliver the core thing this app is for). Do NOT ask about signup, auth, settings, sharing, account management, or any supporting flow yet — those come later, only when I name them.
+   - Once I've answered, produce a single index.html. It is the cheapest possible representation of the primary value flow: a numbered or bulleted list of screen names with a one-sentence description of each, the arrows between them shown either as <a href="#screen-id"> links to in-page anchors or as a short inline <svg> diagram. About 5 list items / arrows total. No per-screen .html files yet.
+   - Add narrations for anything beyond static HTML's reach at the point in the sketch where it would happen, tagged with the bucket of the future stage that will replace them (rules below).
+   - Print a one-line summary of the ~5 things you produced. Then STOP and ask what to add or change next.
 
-   Constraints — strict:
-   - Only static .html files. One file per screen.
+   Subsequent iterations — wait for me to name what to do, then do exactly that:
+   - I will say things like "expand screen 2 into its own page", "add a tags input to screen 3", "rename screen 4 to X", "add the signup flow", "drop the share-modal narration on screen 5", "combine screens 2 and 3". Make about 5 additions or changes that match what I named. Nothing more.
+   - Do NOT add a screen, flow, element, or narration I have not named or explicitly authorized. If you think something is obviously missing, ASK before adding it; do not add it preemptively.
+   - Common iteration moves (only execute when I name them): turn a list item in index.html into its own <screen>.html; add inputs/buttons/SVGs to an existing screen; rewrite a narration to be more specific; combine two screens; split one into two; lift a supporting flow (signup, settings, share) in once the primary value flow feels right.
+   - After each iteration, print a one-line summary of what you changed and STOP. Ask what's next. Do NOT continue past one round on your own.
+
+   Constraints — strict (apply to every iteration):
+   - Only static .html files (plus narrations.css). The index.html starts as a flow sketch; per-screen .html files get added as I direct.
    - <a href="..."> is the ONLY legal way to move between screens.
    - NO JavaScript. NO frameworks. NO component libraries. NO build step. NO package.json. NO tests.
    - Exactly ONE CSS file is allowed: narrations.css, holding only the color-coding rules for narration asides (see Narration tagging below). NO other CSS.
@@ -261,10 +271,12 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
      - backend — behaviors that need a real server (persistence across page reloads, real auth sessions, real-time server events, anything where the actual response shapes behavior)
    - Link narrations.css from every .html file's <head>.
 
-   Output:
-   - A folder of .html files I can open directly in a browser.
-   - A short index.html with a list of all flows and entry points.
-   - narrations.css containing exactly these rules:
+   Per-iteration output:
+   - The updated wireframe folder (index.html, any per-screen .html files, narrations.css). Iteration 1 produces only index.html and narrations.css.
+   - One line summarizing the ~5 things added or changed this iteration.
+   - Then "What's next?" — and STOP. Do NOT run any lint or tests; those come from the Add tests prompt later, when I say the wireframe is far enough along.
+
+   narrations.css contents (write at iteration 1, leave alone afterward):
 
    ```
    aside.narration {
@@ -284,8 +296,6 @@ The instinct to architect early is the failure mode this pipeline corrects. If y
    aside.narration.framework { --c: #f59e0b; --bg: #fffbeb; }
    aside.narration.backend   { --c: #ef4444; --bg: #fef2f2; }
    ```
-
-   - No other files.
    ````
 
    </details>
