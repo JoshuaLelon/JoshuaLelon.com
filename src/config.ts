@@ -14,7 +14,7 @@ export const SITE = {
   editPost: {
     enabled: true,
     text: "Edit page",
-    url: "https://github.com/joshualmitchell/JoshuaLelon.com/edit/main/",
+    url: "https://github.com/JoshuaLelon/JoshuaLelon.com/edit/main/",
   },
   dynamicOgImage: true,
   dir: "ltr", // "rtl" | "auto"
