@@ -15,9 +15,7 @@ const locale = Astro.currentLocale ?? config.site.lang;
     <Card {...entry} label="Post" />
   ) : (
     <li class="my-6">
-      <p class="mb-1 text-xs text-muted-foreground">
-        Prototype{entry.data.sample ? " · Test example" : ""}
-      </p>
+      <p class="mb-1 text-xs text-muted-foreground">Prototype</p>
       <a
         href={getRelativeLocaleUrl(locale, `prototypes/${entry.id}/`)}
         class="inline-block text-lg font-medium text-accent underline-offset-4 hover:underline"

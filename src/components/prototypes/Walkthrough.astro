@@ -1,6 +1,6 @@
 ---
 interface Props {
-  kind: "motion" | "disclosure" | "sentence-abstraction";
+  kind: "sentence-abstraction";
   demo?: string;
   demoAlt?: string;
   embeddedExplanations?: boolean;
@@ -117,8 +117,6 @@ const prefix = `prototype-${kind}`;
 </prototype-walkthrough>
 <script>
   import { walkthrough } from "./walkthrough";
-  import { motionSteps } from "./motionSteps";
-  import { disclosureSteps } from "./disclosureSteps";
   import { sentenceAbstractionSteps } from "./sentenceAbstractionSteps";
   class PrototypeWalkthrough extends HTMLElement {
     private controller?: ReturnType<typeof walkthrough>;
@@ -172,14 +170,7 @@ const prefix = `prototype-${kind}`;
     }
     private initialize() {
       if (this.controller) return;
-      this.controller = walkthrough(
-        this,
-        this.dataset.kind === "motion"
-          ? motionSteps(this)
-          : this.dataset.kind === "sentence-abstraction"
-            ? sentenceAbstractionSteps(this)
-            : disclosureSteps(this)
-      );
+      this.controller = walkthrough(this, sentenceAbstractionSteps(this));
     }
     disconnectedCallback() {
       this.controller?.destroy();
