@@ -1,0 +1,9 @@
+# pnpm 10+ blocks all dependency lifecycle (postinstall) scripts by default
+# (strictDepBuilds). These are the trusted native build-tooling deps this Astro
+# stack needs: sharp (OG image generation), esbuild + @tailwindcss/oxide
+# (bundler + Tailwind v4), workerd (wrangler runtime).
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+  sharp: true
+  workerd: true
