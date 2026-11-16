@@ -1,0 +1,4 @@
+interface:
+  display_name: "create a joshualelon.com prototype"
+  short_description: "build prototypes with looping demos and walkthroughs"
+  default_prompt: "use $create-joshualelon-prototype to build the next prototype in joshualelon.com using our established page format."
