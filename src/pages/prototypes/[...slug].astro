@@ -1,0 +1,102 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import { getRelativeLocaleUrl } from "astro:i18n";
+import Layout from "@/layouts/Layout.astro";
+import Header from "@/components/Header.astro";
+import Footer from "@/components/Footer.astro";
+import config from "@/config";
+import Tag from "@/components/Tag.astro";
+import { slugifyStr } from "@/utils/slugify";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("prototypes", ({ data }) => !data.draft);
+  return entries.map(entry => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+interface Props {
+  entry: CollectionEntry<"prototypes">;
+}
+const { entry } = Astro.props;
+const { data } = entry;
+const { Content } = await render(entry);
+const locale = Astro.currentLocale ?? config.site.lang;
+---
+
+<Layout
+  title={`${data.title} | ${config.site.title}`}
+  description={data.description}
+  ogImage={data.preview}
+>
+  <Header />
+  <main
+    id="main-content"
+    data-pagefind-body
+    class="mx-auto w-full max-w-5xl px-4 pt-10 pb-16"
+  >
+    <header class="mb-8">
+      <nav aria-label="Breadcrumb" class="mb-4">
+        <a
+          href={getRelativeLocaleUrl(locale, "prototypes")}
+          class="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-accent"
+          >← All prototypes</a
+        >
+      </nav>
+      <h1
+        data-pagefind-meta="title"
+        class="max-w-3xl text-3xl leading-tight font-semibold text-balance sm:text-4xl"
+      >
+        {data.title}
+      </h1>
+      <p
+        class="mt-4 max-w-prose text-base leading-relaxed text-pretty text-muted-foreground"
+      >
+        {data.description}
+      </p>
+      {
+        data.tags.length > 0 && (
+          <ul aria-label="topics" class="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+            {data.tags.map(tag => (
+              <Tag
+                tag={slugifyStr(tag)}
+                tagName={tag}
+                size="sm"
+                variant="plain"
+              />
+            ))}
+          </ul>
+        )
+      }
+    </header>
+    <article class="app-prose experiment-body"><Content /></article>
+    {
+      (data.sourceUrl || data.relatedPost) && (
+        <footer class="mt-12 flex max-w-3xl flex-wrap gap-6 border-t border-panel-border pt-6 text-accent">
+          {data.sourceUrl && (
+            <a href={data.sourceUrl} class="hover:underline">
+              View source ↗
+            </a>
+          )}
+          {data.relatedPost && (
+            <a href={data.relatedPost} class="hover:underline">
+              Read the related post →
+            </a>
+          )}
+        </footer>
+      )
+    }
+  </main>
+  <Footer />
+</Layout>
+
+<style>
+  .experiment-body {
+    max-width: none;
+    line-height: 1.65;
+  }
+  .experiment-body :global(> :not(.experiment-stage)) {
+    max-width: 65ch;
+    margin-inline: 0;
+  }
+</style>
