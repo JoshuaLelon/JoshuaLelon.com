@@ -34,4 +34,21 @@ const pages = defineCollection({
   }),
 });
 
-export const collections = { posts, pages };
+const prototypes = defineCollection({
+  loader: glob({ pattern: "**/[^_]*.{md,mdx}", base: "./src/data/prototypes" }),
+  schema: z.object({
+    title: z.string(),
+    description: z.string(),
+    question: z.string(),
+    sample: z.boolean().default(false),
+    preview: z.string().optional(),
+    previewAlt: z.string().optional(),
+    tags: z.array(z.string()).default([]),
+    order: z.number().default(100),
+    draft: z.boolean().default(false),
+    sourceUrl: z.url().optional(),
+    relatedPost: z.string().optional(),
+  }),
+});
+
+export const collections = { posts, pages, prototypes };
