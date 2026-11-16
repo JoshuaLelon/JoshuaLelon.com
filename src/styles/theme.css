@@ -7,12 +7,14 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-border: var(--border);
+  --color-panel-border: var(--panel-border);
   --font-app: var(--font-google-sans-code);
 }
 
 /* Light theme values */
 :root,
 [data-theme="light"] {
+  color-scheme: light;
   --background: #fdfdfd;
   --foreground: #282728;
   --accent: #006cac;
@@ -20,10 +22,12 @@
   --muted: #e6e6e6;
   --muted-foreground: #6b7280;
   --border: #ece9e9;
+  --panel-border: rgb(0 0 0 / 0.12);
 }
 
 /* Dark theme values */
 [data-theme="dark"] {
+  color-scheme: dark;
   --background: #212737;
   --foreground: #eaedf3;
   --accent: #ff6b01;
@@ -31,4 +35,5 @@
   --muted: #343f60;
   --muted-foreground: #afb9ca;
   --border: #ab4b08;
+  --panel-border: rgb(255 255 255 / 0.14);
 }
