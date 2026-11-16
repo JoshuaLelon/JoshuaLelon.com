@@ -1,0 +1,68 @@
+---
+import Walkthrough from "./Walkthrough.astro";
+---
+
+<Walkthrough kind="motion">
+  <div class="canvas" role="img" aria-label="animated card preview">
+    <div class="ghost" aria-hidden="true"></div>
+    <div class="card" id="card">
+      <span class="card-icon">↗</span><strong>A little more room</strong><span
+        class="card-caption">The same card, a different state.</span
+      >
+    </div>
+  </div>
+</Walkthrough>
+<style>
+  .canvas {
+    position: relative;
+    height: 210px;
+    display: grid;
+    place-items: center;
+    margin: 24px 0;
+    background: radial-gradient(var(--edge) 1px, transparent 1px);
+    background-size: 16px 16px;
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .ghost {
+    position: absolute;
+    width: 80%;
+    max-width: 380px;
+    height: 162px;
+    border: 1px dashed var(--edge);
+    border-radius: 16px;
+  }
+  .card {
+    position: relative;
+    width: 80%;
+    max-width: 380px;
+    padding: 20px;
+    border-radius: 16px;
+    background: var(--paper);
+    border: 1px solid var(--edge);
+    box-shadow: 0 14px 35px #273a2720;
+    transform-origin: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .card-icon {
+    display: grid;
+    place-items: center;
+    background: var(--highlight);
+    color: var(--green);
+    border-radius: 9px;
+    width: 36px;
+    height: 36px;
+    font-size: 24px;
+  }
+  .card strong {
+    font-size: 18px;
+    letter-spacing: -0.02em;
+  }
+  .card-caption {
+    font-size: 14px;
+    color: var(--secondary);
+  }
+</style>
