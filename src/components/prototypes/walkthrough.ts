@@ -17,8 +17,8 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
   const panel = root.querySelector<HTMLElement>(".walkthrough")!;
   const stage = root.querySelector<HTMLElement>(".tour-stage")!;
   const caption = panel.querySelector<HTMLElement>(".walkthrough-caption")!;
-  const back = panel.querySelector<HTMLButtonElement>("[data-back]")!;
-  const next = panel.querySelector<HTMLButtonElement>("[data-next]")!;
+  const back = root.querySelector<HTMLButtonElement>("[data-back]")!;
+  const next = root.querySelector<HTMLButtonElement>("[data-next]")!;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let index = 0,
     running = false,
@@ -36,7 +36,7 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
   function controls() {
     back.disabled = index === 0;
     next.disabled = running || index === steps.length - 1;
-    panel.querySelector(".walkthrough-count")!.textContent =
+    root.querySelector(".walkthrough-count")!.textContent =
       `${index + 1} / ${steps.length}`;
   }
   async function show(animate = true) {

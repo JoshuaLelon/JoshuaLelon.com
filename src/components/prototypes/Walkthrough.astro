@@ -11,11 +11,6 @@ const { kind } = Astro.props;
 >
   <div class="demo-inner">
     <section class="walkthrough" aria-label="Demo walkthrough">
-      <div class="walkthrough-nav" role="group" aria-label="Walkthrough steps">
-        <button data-back disabled>← Previous</button>
-        <span class="walkthrough-count"></span>
-        <button data-next disabled>Next →</button>
-      </div>
       <div class="walkthrough-caption" aria-live="polite" aria-atomic="true">
         <strong></strong><p></p>
       </div>
@@ -28,6 +23,11 @@ const { kind } = Astro.props;
       data-pagefind-ignore
     >
       <slot />
+    </div>
+    <div class="walkthrough-nav" role="group" aria-label="Walkthrough steps">
+      <button data-back disabled>← Previous</button>
+      <span class="walkthrough-count"></span>
+      <button data-next disabled>Next →</button>
     </div>
   </div>
 </prototype-walkthrough>
@@ -117,6 +117,8 @@ const { kind } = Astro.props;
   .walkthrough-nav {
     display: flex;
     align-items: center;
+    justify-content: center;
+    margin-top: 24px;
     gap: 12px;
   }
   .walkthrough-count {
@@ -130,7 +132,7 @@ const { kind } = Astro.props;
     font-size: 13px;
     padding-inline: 10px;
   }
-  .walkthrough button:disabled {
+  .walkthrough-nav button:disabled {
     opacity: 0.4;
     cursor: default;
   }
@@ -164,10 +166,6 @@ const { kind } = Astro.props;
     }
   }
   @media (max-width: 440px) {
-    .walkthrough-nav {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-    }
     .walkthrough-caption {
       min-height: 120px;
     }
