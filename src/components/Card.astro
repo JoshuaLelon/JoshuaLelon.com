@@ -6,14 +6,16 @@ import Datetime from "./Datetime.astro";
 
 type Props = {
   variant?: "h2" | "h3";
+  label?: string;
 } & CollectionEntry<"posts">;
 
-const { variant: Heading = "h2", id, data, filePath } = Astro.props;
+const { variant: Heading = "h2", id, data, filePath, label } = Astro.props;
 
 const { title, description, ...props } = data;
 ---
 
 <li class="my-6">
+  {label && <p class="mb-1 text-xs text-muted-foreground">{label}</p>}
   <a
     href={getPostUrl(id, filePath, Astro.currentLocale)}
     class:list={[

@@ -1,0 +1,30 @@
+---
+import { getRelativeLocaleUrl } from "astro:i18n";
+import type { TaggableEntry } from "@/utils/getTaggableEntries";
+import Card from "./Card.astro";
+import config from "@/config";
+interface Props {
+  entry: TaggableEntry;
+}
+const { entry } = Astro.props;
+const locale = Astro.currentLocale ?? config.site.lang;
+---
+
+{
+  entry.collection === "posts" ? (
+    <Card {...entry} label="Post" />
+  ) : (
+    <li class="my-6">
+      <p class="mb-1 text-xs text-muted-foreground">
+        Prototype{entry.data.sample ? " · Test example" : ""}
+      </p>
+      <a
+        href={getRelativeLocaleUrl(locale, `prototypes/${entry.id}/`)}
+        class="inline-block text-lg font-medium text-accent underline-offset-4 hover:underline"
+      >
+        <h2>{entry.data.title}</h2>
+      </a>
+      <p>{entry.data.description}</p>
+    </li>
+  )
+}

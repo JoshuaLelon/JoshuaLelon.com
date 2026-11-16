@@ -39,10 +39,10 @@ export default {
   },
   pages: {
     tagTitle: "Tag",
-    tagDesc: "All the articles with the tag",
+    tagDesc: "Posts and prototypes tagged",
 
     tagsTitle: "Tags",
-    tagsDesc: "All the tags used in posts.",
+    tagsDesc: "Browse topics across posts and prototypes.",
 
     postsTitle: "Posts",
     postsDesc: "All the articles I've posted.",
@@ -51,14 +51,14 @@ export default {
     archivesDesc: "All the articles I've archived.",
 
     searchTitle: "Search",
-    searchDesc: "Search any article ...",
+    searchDesc: "Search posts and experiments ...",
   },
   a11y: {
     skipToContent: "Skip to content",
     openMenu: "Open menu",
     closeMenu: "Close menu",
     toggleTheme: "Toggle theme",
-    searchPlaceholder: "Search posts...",
+    searchPlaceholder: "Search posts and experiments...",
     noResults: "No results found",
     goToPreviousPage: "Go to previous page",
     goToNextPage: "Go to next page",

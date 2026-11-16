@@ -1,5 +1,5 @@
 ---
-import { getCollection } from "astro:content";
+import { getTaggableEntries } from "@/utils/getTaggableEntries";
 import Layout from "@/layouts/Layout.astro";
 import Header from "@/components/Header.astro";
 import Breadcrumb from "@/components/Breadcrumb.astro";
@@ -10,8 +10,7 @@ import { getUniqueTags } from "@/utils/getUniqueTags";
 import { useTranslations } from "@/i18n";
 import config from "@/config";
 
-const posts = await getCollection("posts", ({ data }) => !data.draft);
-const tags = getUniqueTags(posts);
+const tags = getUniqueTags(await getTaggableEntries());
 
 const locale = Astro.currentLocale ?? config.site.lang;
 const t = useTranslations(locale);
