@@ -1,0 +1,149 @@
+---
+import Walkthrough from "./Walkthrough.astro";
+---
+
+<Walkthrough
+  kind="sentence-abstraction"
+  demo="/assets/prototypes/sentence-abstraction"
+  demoAlt="A metaphor within an essay is labeled, moved aside, rewritten as a simile, and returned to the paragraph."
+  embeddedExplanations
+>
+  <div class="essay-scene" data-scene-step="-1" data-walkthrough-step="0">
+    <p class="essay-accessible sr-only"></p>
+    <div class="essay-measure" aria-hidden="true"></div>
+    <div class="pair-layout" aria-hidden="true">
+      <div class="pair-original"></div>
+      <span></span>
+      <div class="pair-replacement"></div>
+    </div>
+    <div class="essay-visual" aria-hidden="true"></div>
+    <div class="scene-narration" aria-live="polite" aria-atomic="true">
+      <p class="explanation-current"></p>
+      <p class="explanation-leaving" aria-hidden="true"></p>
+    </div>
+  </div>
+</Walkthrough>
+
+<style>
+  .essay-scene {
+    position: relative;
+    min-height: 480px;
+    padding: 28px;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink);
+    overflow: clip;
+    font:
+      21px/1.6 Georgia,
+      serif;
+  }
+  .essay-measure {
+    visibility: hidden;
+  }
+  .essay-measure :global(p) {
+    margin: 0;
+  }
+  .essay-measure :global(.ellipsis) {
+    display: block;
+    margin-block: 0 8px;
+  }
+  .essay-measure :global(.ellipsis:last-child) {
+    margin-block: 8px 0;
+  }
+  .pair-layout {
+    position: absolute;
+    inset: 28px 28px calc(33.333333% + 28px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+    gap: 24px;
+    align-content: center;
+    align-items: end;
+    visibility: hidden;
+  }
+  .pair-original,
+  .pair-replacement {
+    padding-bottom: 48px;
+    text-wrap: balance;
+  }
+  .scene-narration {
+    position: absolute;
+    inset: 66.666667% 28px 0;
+    display: grid;
+    place-items: center;
+    color: var(--secondary);
+    font:
+      16px/1.6 system-ui,
+      sans-serif;
+    text-align: center;
+    text-wrap: balance;
+  }
+  .scene-narration p {
+    grid-area: 1 / 1;
+    margin: 0;
+    max-width: 46ch;
+  }
+  .scene-narration :global(em) {
+    font-style: italic;
+  }
+  .explanation-leaving {
+    opacity: 0;
+  }
+  .essay-visual :global(.essay-word),
+  .essay-visual :global(.phrase-annotation),
+  .essay-visual :global(.sentence-underline),
+  .essay-visual :global(.rewrite-arrow) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    will-change: transform, opacity;
+  }
+  .essay-visual :global(.essay-word) {
+    white-space: pre;
+    line-height: 1;
+  }
+  .essay-visual :global(.sentence-underline) {
+    height: 1.5px;
+    background: var(--ink);
+    border-radius: 1px;
+  }
+  .essay-visual :global(.phrase-annotation) {
+    color: var(--green);
+    text-align: center;
+    font:
+      13px/1.5 ui-monospace,
+      monospace;
+  }
+  .essay-visual :global(.underbrace) {
+    display: block;
+    width: 100%;
+    height: 20px;
+    margin-bottom: 3px;
+    overflow: visible;
+  }
+  .essay-visual :global(.rewrite-arrow) {
+    color: var(--secondary);
+    width: 28px;
+    height: 20px;
+  }
+  .essay-visual :global(.rewrite-arrow svg) {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  @media (max-width: 440px) {
+    .essay-scene {
+      min-height: 660px;
+      padding: 18px;
+      font-size: 18px;
+    }
+    .pair-layout {
+      inset: 18px 18px calc(33.333333% + 18px);
+      grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+      gap: 12px;
+    }
+    .scene-narration {
+      inset-inline: 18px;
+    }
+  }
+</style>

@@ -34,12 +34,14 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
     caption.querySelector("p")!.textContent = body;
   }
   function controls() {
+    stage.setAttribute("aria-busy", String(running));
     back.disabled = index === 0;
     next.disabled = running || index === steps.length - 1;
     root.querySelector(".walkthrough-count")!.textContent =
       `${index + 1} / ${steps.length}`;
   }
   async function show(animate = true) {
+    if (!stage.clientWidth) return;
     clear();
     controller = new AbortController();
     const signal = controller.signal;
@@ -93,7 +95,7 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
       });
     try {
       cue(step.target, "action");
-      await tween(550, () => {});
+      if (step.target) await tween(550, () => {});
       signal.throwIfAborted();
       await step.run({ tween, cue });
       signal.throwIfAborted();
@@ -104,14 +106,32 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
       if (!signal.aborted) throw error;
     }
   }
-  back.onclick = () => {
-    index--;
-    show(false);
+  async function navigate(direction: -1 | 1, event: MouseEvent) {
+    if (direction === -1 && index === 0) return;
+    if (direction === 1 && (running || index === steps.length - 1)) return;
+    const keyboard = event.detail === 0;
+    const trigger = direction === 1 ? next : back;
+    index += direction;
+    await show(
+      direction === 1 &&
+        (!keyboard || root.dataset.embeddedExplanations === "true")
+    );
+    // A native disabled button loses focus at either end of the tour.
+    // Keep keyboard users in the navigation rather than dropping onto body.
+    if (
+      keyboard &&
+      trigger.disabled &&
+      (document.activeElement === trigger ||
+        document.activeElement === document.body)
+    ) {
+      (direction === 1 ? back : next).focus({ preventScroll: true });
+    }
+  }
+  back.onclick = event => {
+    void navigate(-1, event);
   };
-  next.onclick = () => {
-    if (running || index === steps.length - 1) return;
-    index++;
-    show();
+  next.onclick = event => {
+    void navigate(1, event);
   };
   const onMotionChange = () => {
     void show(false);
@@ -122,12 +142,26 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
   };
   reduced.addEventListener("change", onMotionChange);
   document.addEventListener("visibilitychange", onVisibility);
+  let width = root.clientWidth;
+  const resize = new ResizeObserver(() => {
+    if (root.clientWidth === width) return;
+    width = root.clientWidth;
+    void show(false);
+  });
+  resize.observe(root);
   void show(false);
-  return () => {
+  const destroy = () => {
     clear();
     back.onclick = null;
     next.onclick = null;
     reduced.removeEventListener("change", onMotionChange);
     document.removeEventListener("visibilitychange", onVisibility);
+    resize.disconnect();
+  };
+  return {
+    destroy,
+    refresh: () => {
+      void show(false);
+    },
   };
 }

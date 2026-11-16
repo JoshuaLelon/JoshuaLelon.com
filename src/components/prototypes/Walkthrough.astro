@@ -1,33 +1,117 @@
 ---
 interface Props {
-  kind: "motion" | "disclosure";
+  kind: "motion" | "disclosure" | "sentence-abstraction";
+  demo?: string;
+  demoAlt?: string;
+  embeddedExplanations?: boolean;
 }
-const { kind } = Astro.props;
+const { kind, demo, demoAlt, embeddedExplanations = false } = Astro.props;
+const prefix = `prototype-${kind}`;
 ---
 
 <prototype-walkthrough
   data-kind={kind}
+  data-has-demo={Boolean(demo)}
+  data-embedded-explanations={embeddedExplanations}
   class:list={["prototype-demo experiment-stage not-prose", `${kind}-demo`]}
 >
   <div class="demo-inner">
-    <section class="walkthrough" aria-label="Demo walkthrough">
-      <div class="walkthrough-caption" aria-live="polite" aria-atomic="true">
-        <strong></strong><p></p>
-      </div>
-    </section>
+    {
+      demo && (
+        <>
+          <div
+            class="prototype-tabs"
+            role="tablist"
+            aria-label="Prototype view"
+          >
+            <button
+              role="tab"
+              id={`${prefix}-demo-tab`}
+              aria-controls={`${prefix}-demo-panel`}
+              aria-selected="true"
+              data-view="demo"
+            >
+              demo
+            </button>
+            <button
+              role="tab"
+              id={`${prefix}-walk-tab`}
+              aria-controls={`${prefix}-walk-panel`}
+              aria-selected="false"
+              tabindex="-1"
+              data-view="walk"
+            >
+              walk through
+            </button>
+          </div>
+          <div
+            id={`${prefix}-demo-panel`}
+            role="tabpanel"
+            aria-labelledby={`${prefix}-demo-tab`}
+            data-demo-panel
+          >
+            {["light", "dark"].map(theme => (
+              <picture class={`demo-recording recording-${theme}`}>
+                <source
+                  media="(prefers-reduced-motion: reduce) and (max-width: 440px)"
+                  srcset={`${demo}-${theme}-mobile.png`}
+                  width="322"
+                  height="438"
+                />
+                <source
+                  media="(prefers-reduced-motion: reduce)"
+                  srcset={`${demo}-${theme}.png`}
+                />
+                <source
+                  media="(max-width: 440px)"
+                  srcset={`${demo}-${theme}-mobile.gif`}
+                  width="322"
+                  height="438"
+                />
+                <img
+                  src={`${demo}-${theme}.gif`}
+                  alt={demoAlt}
+                  loading="lazy"
+                  decoding="async"
+                  width="690"
+                  height="322"
+                />
+              </picture>
+            ))}
+          </div>
+        </>
+      )
+    }
     <div
-      class="tour-stage"
-      role="region"
-      aria-label="Demonstration"
-      tabindex="0"
-      data-pagefind-ignore
+      id={`${prefix}-walk-panel`}
+      role={demo ? "tabpanel" : undefined}
+      aria-labelledby={demo ? `${prefix}-walk-tab` : undefined}
+      data-walk-panel
+      hidden={Boolean(demo)}
     >
-      <slot />
-    </div>
-    <div class="walkthrough-nav" role="group" aria-label="Walkthrough steps">
-      <button data-back disabled>← Previous</button>
-      <span class="walkthrough-count"></span>
-      <button data-next disabled>Next →</button>
+      <section
+        class="walkthrough"
+        aria-label="Demo walkthrough"
+        hidden={embeddedExplanations}
+      >
+        <div class="walkthrough-caption" aria-live="polite" aria-atomic="true">
+          <strong></strong><p></p>
+        </div>
+      </section>
+      <div
+        class="tour-stage"
+        role="region"
+        aria-label="Demonstration"
+        tabindex="0"
+        data-pagefind-ignore
+      >
+        <slot />
+      </div>
+      <div class="walkthrough-nav" role="group" aria-label="Walkthrough steps">
+        <button data-back disabled>← Previous</button>
+        <span class="walkthrough-count"></span>
+        <button data-next disabled>Next →</button>
+      </div>
     </div>
   </div>
 </prototype-walkthrough>
@@ -35,20 +119,73 @@ const { kind } = Astro.props;
   import { walkthrough } from "./walkthrough";
   import { motionSteps } from "./motionSteps";
   import { disclosureSteps } from "./disclosureSteps";
+  import { sentenceAbstractionSteps } from "./sentenceAbstractionSteps";
   class PrototypeWalkthrough extends HTMLElement {
-    private cleanup?: () => void;
+    private controller?: ReturnType<typeof walkthrough>;
+    private events?: AbortController;
     connectedCallback() {
-      if (this.cleanup) return;
-      this.cleanup = walkthrough(
+      if (this.events) return;
+      this.events = new AbortController();
+      const tabs = [
+        ...this.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
+      ];
+      const walkPanel = this.querySelector<HTMLElement>("[data-walk-panel]")!;
+      const demoPanel = this.querySelector<HTMLElement>("[data-demo-panel]");
+      const select = (tab: HTMLButtonElement) => {
+        tabs.forEach(item => {
+          item.setAttribute("aria-selected", String(item === tab));
+          item.tabIndex = item === tab ? 0 : -1;
+        });
+        walkPanel.hidden = tab.dataset.view !== "walk";
+        if (demoPanel) demoPanel.hidden = !walkPanel.hidden;
+        if (!walkPanel.hidden) {
+          this.initialize();
+          this.controller?.refresh();
+        }
+      };
+      tabs.forEach((tab, index) => {
+        tab.addEventListener("click", () => select(tab), {
+          signal: this.events!.signal,
+        });
+        tab.addEventListener(
+          "keydown",
+          event => {
+            const destination =
+              event.key === "Home"
+                ? 0
+                : event.key === "End"
+                  ? tabs.length - 1
+                  : event.key === "ArrowRight"
+                    ? (index + 1) % tabs.length
+                    : event.key === "ArrowLeft"
+                      ? (index + tabs.length - 1) % tabs.length
+                      : null;
+            if (destination === null) return;
+            event.preventDefault();
+            select(tabs[destination]);
+            tabs[destination].focus();
+          },
+          { signal: this.events!.signal }
+        );
+      });
+      if (!walkPanel.hidden) this.initialize();
+    }
+    private initialize() {
+      if (this.controller) return;
+      this.controller = walkthrough(
         this,
         this.dataset.kind === "motion"
           ? motionSteps(this)
-          : disclosureSteps(this)
+          : this.dataset.kind === "sentence-abstraction"
+            ? sentenceAbstractionSteps(this)
+            : disclosureSteps(this)
       );
     }
     disconnectedCallback() {
-      this.cleanup?.();
-      this.cleanup = undefined;
+      this.controller?.destroy();
+      this.controller = undefined;
+      this.events?.abort();
+      this.events = undefined;
     }
   }
   if (!customElements.get("prototype-walkthrough"))
@@ -87,6 +224,43 @@ const { kind } = Astro.props;
     max-width: 740px;
     margin: auto;
     padding: 24px;
+  }
+  [hidden] {
+    display: none !important;
+  }
+  .prototype-tabs {
+    display: flex;
+    gap: 24px;
+    border-bottom: 1px solid var(--edge);
+    margin-bottom: 24px;
+  }
+  .prototype-tabs button {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 8px 0;
+    color: var(--secondary);
+    border-bottom: 2px solid transparent;
+  }
+  .prototype-tabs button[aria-selected="true"] {
+    border-bottom-color: var(--green);
+    color: var(--ink);
+  }
+  .demo-recording img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+  }
+  .recording-dark {
+    display: none;
+  }
+  :global([data-theme="dark"]) .recording-light {
+    display: none;
+  }
+  :global([data-theme="dark"]) .recording-dark {
+    display: block;
   }
   button {
     min-height: 44px;
@@ -147,6 +321,21 @@ const { kind } = Astro.props;
   .walkthrough-caption :global(p) {
     margin: 5px 0 0;
     color: var(--secondary);
+  }
+  .sentence-abstraction-demo .walkthrough {
+    margin-bottom: 16px;
+  }
+  .sentence-abstraction-demo .walkthrough-caption {
+    min-height: 72px;
+    padding-top: 0;
+  }
+  @media (max-width: 440px) {
+    .sentence-abstraction-demo .demo-inner {
+      padding: 16px;
+    }
+    .sentence-abstraction-demo .walkthrough-caption {
+      min-height: 96px;
+    }
   }
   .prototype-demo :global([data-tour-cue="action"]) {
     outline: 3px solid var(--green);
