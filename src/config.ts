@@ -12,7 +12,8 @@ export const SITE = {
   showArchives: true,
   showBackButton: true, // show back button in post detail
   editPost: {
-    enabled: true,
+    // Markdown source files live in this repository.
+    enabled: false,
     text: "Edit page",
     url: "https://github.com/JoshuaLelon/JoshuaLelon.com/edit/main/",
   },
