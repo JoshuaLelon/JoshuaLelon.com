@@ -1,0 +1,19 @@
+---
+import type { CollectionEntry } from "astro:content";
+import MotionDemo from "./MotionDemo.astro";
+import DisclosureDemo from "./DisclosureDemo.astro";
+import SentenceAbstractionDemo from "./SentenceAbstractionDemo.astro";
+
+interface Props {
+  kind: CollectionEntry<"prototypes">["data"]["demo"];
+}
+
+const demos = {
+  motion: MotionDemo,
+  disclosure: DisclosureDemo,
+  "sentence-abstraction": SentenceAbstractionDemo,
+};
+const Demo = demos[Astro.props.kind];
+---
+
+<Demo />
