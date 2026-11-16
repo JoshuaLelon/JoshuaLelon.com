@@ -349,7 +349,7 @@ At this point, it's a folder of static `.html` files, one per screen, linked wit
 
 The wireframe is doing two jobs at once: it's the thing you (and anyone you're pitching) click through to *get* the idea, and it's the spec the rest of the pipeline consumes. Narrations are what lets those two jobs coexist — even behavior you can't render yet is described precisely enough that a reader walking the flow still feels what happens at each point, and a future stage still has something specific to implement.
 
-<details>
+<details id="narrations">
 <summary>About Narrations</summary>
 
 Narrations are the **unit of description** that runs through the whole pipeline. They are not an escape hatch — they are how the wireframe expresses behavior *before* the corresponding HTML, React, network, or backend exists to render it. At iteration 1 the wireframe is mostly narrations, because you haven't built any UI yet; you just have screens with descriptions of what they show and what the user can do. Subsequent iterations convert narrations into static HTML wherever static HTML can express the thing (a button, a form, an `<a href>`); narrations that can't yet be replaced — animation, async state, real-time updates, drag, persistence, routing — stay in place, tagged with the bucket of the future stage that *will* replace them:

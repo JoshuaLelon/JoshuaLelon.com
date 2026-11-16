@@ -6,7 +6,7 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
 <div
   id="btt-btn-container"
   class:list={[
-    "fixed bottom-6 left-1/2 -translate-x-1/2 z-50",
+    "fixed bottom-6 left-1/2 z-50 -translate-x-1/2",
     "flex flex-row items-center gap-2",
     "translate-y-14 opacity-0 transition duration-500",
   ]}
@@ -75,8 +75,12 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
     const rootElement = document.documentElement;
     const btnContainer = document.querySelector("#btt-btn-container");
     const backToTopBtn = document.querySelector("[data-button='back-to-top']");
-    const prevSectionBtn = document.querySelector("[data-button='prev-section']");
-    const nextSectionBtn = document.querySelector("[data-button='next-section']");
+    const prevSectionBtn = document.querySelector(
+      "[data-button='prev-section']"
+    );
+    const nextSectionBtn = document.querySelector(
+      "[data-button='next-section']"
+    );
     const progressIndicator = document.querySelector("#progress-indicator");
 
     if (!rootElement || !btnContainer || !backToTopBtn || !progressIndicator)
@@ -118,7 +122,8 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
         const current = currentSectionIndex();
         const targetIdx = Math.max(0, current - 1);
         const target = sections[targetIdx];
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (target)
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
 
@@ -129,7 +134,8 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
         const current = currentSectionIndex();
         const targetIdx = Math.min(sections.length - 1, current + 1);
         const target = sections[targetIdx];
-        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (target)
+          target.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
 
