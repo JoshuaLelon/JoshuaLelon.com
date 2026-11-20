@@ -1,0 +1,930 @@
+---
+import Walkthrough from "./Walkthrough.astro";
+---
+
+<Walkthrough
+  kind="one-choice-at-a-time"
+  demo="/assets/prototypes/one-choice-at-a-time"
+  demoAlt="a blank page becomes a short mystery as a writer chooses a genre, records a character, expands an outline, and tries another version of the opening."
+  embeddedExplanations
+  recordingSize={[690, 474]}
+  mobileSize={[322, 572]}
+>
+  <section class="writing-scene">
+    <template data-dictation>
+      <div class="dictation-row">
+        <p class="dictated-words">
+          “actually, i want to talk about the main character.”
+        </p>
+        <button
+          class="dictation-mic"
+          type="button"
+          data-write="redirect"
+          aria-label="dictate"
+          title="dictate"
+          disabled
+        >
+          <svg
+            width="19"
+            height="19"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.7"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="9" y="2" width="6" height="13" rx="3"></rect>
+            <path d="M5.5 10.5v1a6.5 6.5 0 0 0 13 0v-1M12 18v4m-3 0h6"></path>
+          </svg>
+        </button>
+      </div>
+    </template>
+    <div class="writing-workbench" aria-label="writing canvas">
+      <div class="writing-pointer" aria-hidden="true" hidden>
+        <svg width="23" height="29" viewBox="0 0 23 29" focusable="false">
+          <path
+            d="M2 2 20 16.3l-8 .9 4 8.2-4 1.8-3.8-8.5-5.4 5.4z"
+            fill="var(--ink)"
+            stroke="var(--paper)"
+            stroke-width="1.7"
+            stroke-linejoin="round"></path>
+        </svg>
+      </div>
+      <div class="draft-page" aria-label="document"></div>
+      <div class="decision-dock" aria-label="writing choices"></div>
+    </div>
+    <div
+      class="writing-help-card"
+      popover="auto"
+      role="dialog"
+      aria-label="writing reference"
+    >
+      <strong></strong><button type="button" aria-label="close help">×</button>
+      <p></p><figure><figcaption>example</figcaption><div></div></figure><footer
+      >
+      </footer>
+    </div>
+    <div class="writing-narration" aria-live="polite"><p></p></div>
+  </section>
+</Walkthrough>
+<style is:global>
+  .writing-scene {
+    container-type: inline-size;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    overflow: clip;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .writing-workbench {
+    position: relative;
+    isolation: isolate;
+    height: calc(var(--workbench-height, 474px) + var(--dictation-space, 0px));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    font:
+      14px/1.45 system-ui,
+      sans-serif;
+  }
+  .writing-workbench [data-chosen="true"] {
+    background: color-mix(
+      in srgb,
+      var(--highlight) var(--press-fill),
+      var(--press-base, transparent)
+    );
+    box-shadow: inset 0 0 0 1px
+      color-mix(in srgb, var(--green) var(--press-fill), transparent);
+    color: color-mix(in srgb, var(--green) var(--press-fill), currentColor);
+  }
+  .writing-pointer {
+    position: absolute;
+    inset: 0 auto auto 0;
+    z-index: 3;
+    line-height: 0;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.26));
+  }
+  .writing-pointer svg {
+    transform: translate(-2px, -2px);
+    transform-origin: 2px 2px;
+  }
+  .draft-page [data-drafting] {
+    position: relative;
+  }
+  .writing-loader {
+    opacity: 0;
+    position: absolute;
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    width: 26px;
+    height: 17px;
+    gap: 3px;
+    pointer-events: none;
+  }
+  .writing-loader i {
+    display: block;
+    width: 22px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--green);
+    transform-origin: left;
+  }
+  .writing-loader i:nth-child(2) {
+    width: 25px;
+  }
+  .writing-loader i:nth-child(3) {
+    width: 14px;
+  }
+  .writing-workbench[inert] {
+    visibility: hidden;
+  }
+  .writing-scene button {
+    min-height: 38px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 5px;
+    font: inherit;
+    color: inherit;
+    cursor: default;
+    opacity: 1;
+    -webkit-text-fill-color: currentColor;
+  }
+  .writing-scene button:focus-visible,
+  .writing-scene [tabindex]:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: -2px;
+  }
+  .decision-head,
+  .choice-list,
+  .range-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .decision-head button,
+  .range-controls button {
+    font-size: 12px;
+    color: var(--secondary);
+  }
+  .draft-page {
+    position: relative;
+    --selection-fill: #d4e6c2;
+    align-content: start;
+    overflow: auto;
+    scrollbar-width: thin;
+    padding: 24px 32px;
+  }
+  .draft-page p,
+  .draft-page .premise-text,
+  .draft-page .beat-text {
+    margin: 0;
+    font:
+      18px/1.48 Georgia,
+      serif;
+  }
+  [data-theme="dark"] .draft-page {
+    --selection-fill: #486143;
+  }
+  .draft-page .draft-words {
+    opacity: var(--prose-opacity, 1);
+  }
+  .draft-page :is(.sentence-label, .term-label, .draft-disclosure),
+  .draft-page .term-annotation::before {
+    opacity: var(--annotation-opacity, 1);
+  }
+  .draft-page[data-selected] .draft-words,
+  .draft-page [data-selected] .draft-words {
+    border-radius: 2px;
+    --selected-ink: color-mix(
+      in srgb,
+      var(--selection-fill) var(--selection-amount, 100%),
+      transparent
+    );
+    background: color-mix(
+      in srgb,
+      var(--selected-ink) var(--revision-fill, 100%),
+      transparent
+    );
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  .draft-page .blank-sheet {
+    display: block;
+    width: 1ch;
+    height: 28px;
+    border-inline-start: 2px solid var(--green);
+  }
+  .draft-page[data-selected] .blank-sheet {
+    background: color-mix(
+      in srgb,
+      var(--selection-fill) var(--selection-amount, 100%),
+      transparent
+    );
+  }
+  .draft-tree {
+    --disclosure-width: 20px;
+    --bracket-ink: var(--secondary);
+  }
+  .sentence-annotation {
+    display: inline-grid;
+    grid-template-columns: minmax(0, auto) auto;
+    align-items: center;
+    column-gap: 6px;
+    width: fit-content;
+    max-width: 100%;
+  }
+  .sentence-label,
+  .writing-scene .sentence-label button,
+  .writing-scene .term-label {
+    color: var(--secondary);
+    font:
+      11px/1.4 ui-monospace,
+      monospace;
+  }
+  .sentence-label {
+    display: flex;
+    position: relative;
+    align-items: center;
+    align-self: stretch;
+    padding-inline-start: 11px;
+  }
+  .sentence-label::before {
+    content: "";
+    position: absolute;
+    inset-block: 2px;
+    inset-inline-start: 0;
+    width: 5px;
+    border: 1px solid var(--bracket-ink);
+    border-inline-start: 0;
+  }
+  .writing-scene .sentence-label button,
+  .writing-scene .term-label {
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 2px;
+  }
+  .document-type,
+  .act-menu-anchor {
+    position: relative;
+  }
+  .document-type {
+    min-inline-size: calc(var(--genre-chars) * 1ch + 1em);
+  }
+  .writing-scene .taxonomy-trigger {
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .revision-label {
+    display: inline-grid;
+    vertical-align: baseline;
+  }
+  .revision-label > span {
+    grid-area: 1 / 1;
+    justify-self: start;
+    text-align: left;
+    white-space: pre;
+  }
+  .document-labels::before {
+    scale: 1 var(--bracket-scale, 1);
+  }
+  :is(.document-labels, .beat-label)::before {
+    transform: var(--scope-line-transform, none);
+    transform-origin: left center;
+  }
+  .revision-word {
+    display: inline-block;
+  }
+  .revision-overlay {
+    position: absolute;
+    inset: 0 0 auto;
+    padding: inherit;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .revision-overlay [data-revision-source] .draft-words {
+    visibility: visible;
+  }
+  .taxonomy-trigger::after {
+    content: "";
+    display: inline-block;
+    vertical-align: 0.18em;
+    translate: var(--caret-offset, 0px) 0;
+    margin-inline-start: 0.45em;
+    width: 5px;
+    height: 5px;
+    border: solid currentColor;
+    border-width: 0 1px 1px 0;
+    transform: rotate(45deg);
+  }
+  .taxonomy-trigger[aria-expanded="true"]::after {
+    transform: rotate(225deg);
+  }
+  .genre-menu {
+    position: absolute;
+    z-index: 2;
+    inset: calc(100% + 5px) 0 auto auto;
+    display: grid;
+    width: max-content;
+    min-width: 132px;
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--edge);
+    background: var(--paper);
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.14);
+  }
+  .writing-scene .genre-menu [role="menuitemradio"] {
+    text-align: left;
+    min-height: 0;
+    padding: 3px 8px;
+    color: var(--ink);
+    font:
+      12px/1.45 system-ui,
+      sans-serif;
+  }
+  .genre-menu [aria-checked="true"]::after {
+    content: "✓";
+    float: right;
+    color: var(--green);
+    margin-inline-start: 12px;
+  }
+  .term-annotation {
+    display: inline-block;
+    position: relative;
+    max-width: 100%;
+    padding-block-start: calc(20px * var(--term-space, 1));
+  }
+  .term-annotation::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 16px;
+    height: 4px;
+    border: 1px solid var(--bracket-ink);
+    border-block-end: 0;
+  }
+  .term-annotation::before,
+  .term-annotation > .term-label {
+    translate: var(--term-x, 0px) var(--term-y, 0px);
+  }
+  .term-annotation > .genre-menu {
+    inset: calc(100% + 4px) auto auto 0;
+  }
+  .writing-scene .term-label {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
+  .premise-row,
+  .beat-branch {
+    padding-inline-start: var(--disclosure-width);
+    width: fit-content;
+    max-width: 100%;
+  }
+  .writing-scene .draft-disclosure {
+    position: relative;
+    display: inline-block;
+    vertical-align: baseline;
+    width: var(--disclosure-width);
+    height: 0.8em;
+    margin-inline-start: calc(0px - var(--disclosure-width));
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    color: var(--green);
+    font: inherit;
+  }
+  .branch-caption {
+    display: block;
+    margin-inline-start: calc(0px - var(--disclosure-width));
+    padding-block-end: 5px;
+    color: var(--green);
+    font:
+      11px/1.4 ui-monospace,
+      monospace;
+  }
+  .branch-caption:empty {
+    display: none;
+  }
+  /* Reserve the action line on individually selected beats. */
+  .beat[data-selected] .act-body > .branch-caption {
+    display: block;
+    min-block-size: calc(1.4em + 5px);
+  }
+  .draft-page :is(.branch-caption, .draft-disclosure[data-caption]) {
+    opacity: var(--branch-action-opacity, var(--annotation-opacity, 1));
+  }
+  .draft-disclosure.generate-branch::before {
+    content: "✦";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    font:
+      16px/1 system-ui,
+      sans-serif;
+  }
+  .draft-page .scene-prose {
+    margin-inline-start: var(--disclosure-width);
+    padding-block-start: 5px;
+  }
+  .draft-disclosure[aria-expanded]::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 52%;
+    width: 7px;
+    height: 7px;
+    border: solid currentColor;
+    border-width: 1.5px 1.5px 0 0;
+    transform: translate(-65%, -50%) rotate(45deg);
+  }
+  .draft-disclosure[aria-expanded="true"]::before {
+    transform: translate(-50%, -65%) rotate(135deg);
+  }
+  .beat-list {
+    display: grid;
+    gap: 5px;
+    margin: 10px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .beat-list .beat {
+    margin: 0;
+    padding: 3px 0;
+  }
+  .beat-branch .draft-disclosure,
+  .beat-list .beat-text {
+    font-size: 16px;
+    line-height: 1.42;
+  }
+  .draft-page .finished-copy p + p {
+    margin-top: 0.6em;
+  }
+  .decision-dock {
+    padding: 8px 24px
+      calc(var(--dock-inset, 16px) + var(--dictation-space, 0px));
+    background: var(--canvas);
+    border-top: 1px solid var(--edge);
+  }
+  .dictation-row {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    margin-top: 4px;
+  }
+  .writing-scene .dictation-mic {
+    display: grid;
+    place-items: center;
+    transform: translateY(var(--dictation-space, 0px));
+    min-height: 32px;
+    width: 34px;
+    padding: 0;
+    border-radius: 50%;
+    color: var(--secondary);
+  }
+  .dictation-mic[aria-pressed="true"] {
+    background: var(--highlight);
+    color: var(--green);
+  }
+  .dictated-words {
+    position: absolute;
+    inset: 0 0 auto;
+    min-height: 100%;
+    display: grid;
+    align-content: center;
+    margin: 0;
+    visibility: hidden;
+    opacity: var(--dictation-opacity, 0);
+    text-align: center;
+    font:
+      16px/1.5 system-ui,
+      sans-serif;
+  }
+  .writing-scene[data-dictating] .dictated-words {
+    visibility: visible;
+  }
+  .decision-dock:empty {
+    display: none;
+  }
+  .decision-head {
+    flex-wrap: wrap;
+    min-height: 30px;
+  }
+  .decision-head > div {
+    margin-inline-start: auto;
+  }
+  .decision-head button {
+    min-height: 30px;
+    padding: 0 4px;
+  }
+  .decision-head .panel-label {
+    font:
+      11px/1.4 ui-monospace,
+      monospace;
+    color: var(--secondary);
+  }
+  .question-line {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    align-items: flex-start;
+    margin: 4px auto 10px;
+  }
+  .decision-dock h4 {
+    display: grid;
+    margin: 0;
+    text-align: center;
+    font:
+      600 17px/1.3 system-ui,
+      sans-serif;
+  }
+  .decision-dock h4 > span {
+    grid-area: 1 / 1;
+  }
+  .choice-window {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: clamp(12rem, 33.333cqi, 100%);
+    max-width: 100%;
+    margin-inline: auto;
+  }
+  .choice-window::before,
+  .choice-window::after {
+    grid-area: 1 / 1;
+    content: "";
+    position: absolute;
+    z-index: 1;
+    inset-block: 3px 6px;
+    pointer-events: none;
+  }
+  .choice-window::before {
+    left: 0;
+    width: var(--fade-left, 0px);
+    background: linear-gradient(to right, var(--canvas), transparent);
+  }
+  .choice-window::after {
+    right: 0;
+    width: var(--fade-right, 0px);
+    background: linear-gradient(to left, var(--canvas), transparent);
+  }
+  .choice-list {
+    grid-area: 1 / 1;
+    justify-content: safe center;
+    cursor: grab;
+    user-select: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding: 3px 0 4px;
+    gap: 6px;
+  }
+  .choice-list::-webkit-scrollbar {
+    display: none;
+  }
+  .choice-scrollbar {
+    grid-row: 2;
+    display: block;
+    appearance: none;
+    box-sizing: border-box;
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    color: #0c100c;
+    background: transparent;
+    opacity: 0.5;
+    cursor: pointer;
+    touch-action: pan-y;
+    transition: opacity 200ms ease-out;
+    --track: color-mix(in srgb, currentColor 10%, transparent);
+    --thumb: max(24px, var(--thumb-width));
+  }
+  .choice-scrollbar[hidden] {
+    display: none;
+  }
+  [data-theme="dark"] .choice-scrollbar {
+    color: var(--ink);
+  }
+  .choice-scrollbar[data-scrolling] {
+    opacity: 1;
+    transition-duration: 75ms;
+  }
+  .choice-scrollbar:focus-visible {
+    outline: 2px solid var(--green);
+  }
+  .choice-scrollbar::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 4px;
+    background: var(--track);
+  }
+  .choice-scrollbar::-moz-range-track {
+    height: 4px;
+    border-radius: 4px;
+    background: var(--track);
+  }
+  .choice-scrollbar::-webkit-slider-thumb {
+    appearance: none;
+    width: var(--thumb);
+    height: 4px;
+    border: 0;
+    border-radius: 4px;
+    background: currentColor;
+  }
+  .choice-scrollbar::-moz-range-thumb {
+    width: var(--thumb);
+    height: 4px;
+    border: 0;
+    border-radius: 4px;
+    background: currentColor;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .choice-scrollbar {
+      transition: none;
+    }
+  }
+  @media (forced-colors: active) {
+    .choice-scrollbar {
+      forced-color-adjust: none;
+      color: ButtonText;
+      --track: ButtonFace;
+      outline: 1px solid ButtonText;
+      outline-offset: -1px;
+      opacity: 1;
+    }
+    .choice-scrollbar:focus-visible {
+      outline: 2px solid Highlight;
+    }
+  }
+  .tour-stage[aria-busy="true"] :is(.choice-list, .choice-scrollbar) {
+    pointer-events: none;
+  }
+  .choice-list:active {
+    cursor: grabbing;
+  }
+  .choice-item {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+  }
+  .choice-list .choice-item > button:first-child {
+    --press-base: var(--paper);
+    pointer-events: none;
+    flex: none;
+    padding: 7px 17px;
+    background: var(--paper);
+    border-color: var(--edge);
+    font-size: 13px;
+  }
+  .choice-label {
+    display: inline-block;
+    transform: translateX(var(--choice-label-offset, -6px));
+  }
+  .writing-scene .writing-help {
+    min-height: 24px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    color: var(--secondary);
+    font-size: 0;
+    border: 0;
+    cursor: pointer;
+  }
+  .writing-help::after {
+    content: "?";
+    display: grid;
+    place-items: center;
+    width: 13px;
+    height: 13px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font:
+      600 10px/1 system-ui,
+      sans-serif;
+  }
+  .writing-help:is(:hover, :focus-visible, [aria-expanded="true"])::after {
+    color: var(--green);
+    background: var(--highlight);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .choice-item {
+      --choice-label-offset: 0px;
+    }
+    .choice-label {
+      transition: transform 140ms ease-out;
+    }
+    .writing-scene .writing-help {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease-out;
+    }
+    :is(.question-line, .choice-item):is(
+      :hover,
+      [data-help-hover],
+      :has(> .writing-help:is(:focus-visible, [aria-expanded="true"]))
+    ) {
+      --choice-label-offset: -6px;
+      > .writing-help {
+        opacity: 1;
+        pointer-events: auto;
+      }
+    }
+  }
+  .question-line .writing-help {
+    flex: none;
+    margin-top: -4px;
+  }
+  .choice-item > .writing-help {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+  .writing-scene .genre-menu .choice-item > button:first-child {
+    width: 100%;
+    padding-right: 26px;
+  }
+  .writing-help-card {
+    position: fixed;
+    inset: auto;
+    --card-width: min(18rem, calc(100vw - 16px));
+    width: var(--card-width);
+    box-sizing: border-box;
+    left: clamp(
+      8px,
+      calc(var(--help-x) - var(--card-width) / 2),
+      calc(100vw - var(--card-width) - 8px)
+    );
+    margin: 0;
+    padding: 14px 16px 12px;
+    overflow: auto;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 0.16);
+    font:
+      14px/1.45 system-ui,
+      sans-serif;
+    opacity: 0;
+    transition:
+      opacity 150ms ease-out,
+      display 150ms allow-discrete,
+      overlay 150ms allow-discrete;
+  }
+  .writing-help-card:popover-open {
+    opacity: 1;
+  }
+  @starting-style {
+    .writing-help-card:popover-open {
+      opacity: 0;
+    }
+  }
+  .writing-help-card strong {
+    display: block;
+    padding-right: 20px;
+  }
+  .writing-help-card strong:empty {
+    display: none;
+  }
+  .writing-help-card strong:empty ~ p {
+    margin-top: 0;
+    padding-inline-end: 20px;
+  }
+  .writing-help-card button {
+    position: absolute;
+    inset: 5px 5px auto auto;
+    padding: 0;
+    min-height: 28px;
+    width: 28px;
+    font-size: 20px;
+    color: var(--secondary);
+    cursor: pointer;
+  }
+  .writing-help-card p {
+    margin: 6px 0;
+  }
+  .writing-help-card figure {
+    margin: 9px 0;
+    padding-inline-start: 10px;
+    border-inline-start: 2px solid var(--green);
+    font:
+      15px/1.45 Georgia,
+      serif;
+  }
+  .writing-help-card figcaption {
+    font:
+      600 11px/1.4 system-ui,
+      sans-serif;
+    color: var(--secondary);
+    margin-bottom: 2px;
+  }
+  .writing-help-card footer {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--secondary);
+  }
+  .writing-help-card a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .choice-label,
+    .writing-scene .writing-help,
+    .writing-help-card {
+      transition: none;
+    }
+  }
+  .range-controls {
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .range-controls button {
+    min-height: 32px;
+  }
+  .range-controls button[data-unavailable] {
+    opacity: 0.38;
+    cursor: default;
+  }
+  .writing-narration {
+    min-height: calc(
+      var(--narration-height, 145px) - var(--dictation-space, 0px)
+    );
+    display: grid;
+    padding-block: max(
+      6px,
+      calc(var(--caption-inset, 20px) - var(--dictation-space, 0px) / 2)
+    );
+    padding-inline: 26px;
+    place-items: center;
+    border-top: 1px solid var(--edge);
+    text-align: center;
+    background: var(--paper);
+  }
+  .writing-narration p {
+    margin: 0;
+    max-width: 48ch;
+    font:
+      15px/1.55 system-ui,
+      sans-serif;
+    color: var(--secondary);
+    text-wrap: balance;
+  }
+  @container (max-width: 455px) {
+    .writing-workbench {
+      --workbench-height: 572px;
+    }
+    .draft-page {
+      padding: 14px 12px;
+    }
+    .decision-dock {
+      --dock-inset: 12px;
+      padding-inline: 12px;
+    }
+    .decision-dock button:not(.writing-help) {
+      min-height: 44px;
+    }
+    .writing-narration {
+      --narration-height: 148px;
+      --caption-inset: 18px;
+      padding-inline: 18px;
+    }
+
+    .premise-row:has(.beat-list) > .sentence-annotation,
+    .beat-branch:has(.act-menu-anchor) > .sentence-annotation {
+      grid-template-columns: minmax(0, 1fr) 6px;
+      padding-top: 19px;
+    }
+    .premise-row:has(.beat-list) .document-labels,
+    .beat-label:has(.act-menu-anchor) {
+      padding: 0;
+    }
+    .premise-row:has(.beat-list) .document-type,
+    .act-menu-anchor {
+      position: absolute;
+      right: 0;
+      top: -19px;
+      text-align: right;
+      min-inline-size: 0;
+    }
+    .draft-page .beat-text {
+      font-size: 15px;
+      line-height: 1.4;
+    }
+    .decision-head button {
+      min-height: 30px;
+      font-size: 11px;
+    }
+  }
+</style>

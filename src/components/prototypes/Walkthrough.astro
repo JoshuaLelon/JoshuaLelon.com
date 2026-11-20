@@ -1,6 +1,6 @@
 ---
 interface Props {
-  kind: "sentence-abstraction";
+  kind: "sentence-abstraction" | "one-choice-at-a-time";
   recordingSize?: [number, number];
   mobileSize?: [number, number];
   demo?: string;
@@ -127,6 +127,7 @@ const prefix = `prototype-${kind}`;
 <script>
   import { walkthrough } from "./walkthrough";
   import { sentenceAbstractionSteps } from "./sentenceAbstractionSteps";
+  import { writingSteps } from "./writingSteps";
   class PrototypeWalkthrough extends HTMLElement {
     private controller?: ReturnType<typeof walkthrough>;
     private events?: AbortController;
@@ -179,7 +180,12 @@ const prefix = `prototype-${kind}`;
     }
     private initialize() {
       if (this.controller) return;
-      this.controller = walkthrough(this, sentenceAbstractionSteps(this));
+      this.controller = walkthrough(
+        this,
+        this.dataset.kind === "one-choice-at-a-time"
+          ? writingSteps(this)
+          : sentenceAbstractionSteps(this)
+      );
     }
     disconnectedCallback() {
       this.controller?.destroy();
