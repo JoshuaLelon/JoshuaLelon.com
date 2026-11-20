@@ -38,7 +38,7 @@ const prototypes = defineCollection({
   loader: glob({ pattern: "**/[^_]*.{md,mdx}", base: "./src/data/prototypes" }),
   schema: z.object({
     title: z.string(),
-    demo: z.enum(["sentence-abstraction"]),
+    demo: z.enum(["sentence-abstraction", "one-choice-at-a-time"]),
     description: z.string(),
     question: z.string(),
     preview: z.string().optional(),

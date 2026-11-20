@@ -2,12 +2,15 @@
 import type { CollectionEntry } from "astro:content";
 import SentenceAbstractionDemo from "./SentenceAbstractionDemo.astro";
 
+import WritingChoices from "./WritingChoices.astro";
+
 interface Props {
   kind: CollectionEntry<"prototypes">["data"]["demo"];
 }
 
 const demos = {
   "sentence-abstraction": SentenceAbstractionDemo,
+  "one-choice-at-a-time": WritingChoices,
 };
 const Demo = demos[Astro.props.kind];
 ---
