@@ -113,8 +113,8 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
     const trigger = direction === 1 ? next : back;
     index += direction;
     await show(
-      direction === 1 &&
-        (!keyboard || root.dataset.embeddedExplanations === "true")
+      root.dataset.embeddedExplanations === "true" ||
+        (direction === 1 && !keyboard)
     );
     // A native disabled button loses focus at either end of the tour.
     // Keep keyboard users in the navigation rather than dropping onto body.
