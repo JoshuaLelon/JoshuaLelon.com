@@ -1,11 +1,20 @@
 ---
 interface Props {
   kind: "sentence-abstraction";
+  recordingSize?: [number, number];
+  mobileSize?: [number, number];
   demo?: string;
   demoAlt?: string;
   embeddedExplanations?: boolean;
 }
-const { kind, demo, demoAlt, embeddedExplanations = false } = Astro.props;
+const {
+  kind,
+  demo,
+  demoAlt,
+  embeddedExplanations = false,
+  recordingSize = [690, 322],
+  mobileSize = [322, 438],
+} = Astro.props;
 const prefix = `prototype-${kind}`;
 ---
 
@@ -55,8 +64,8 @@ const prefix = `prototype-${kind}`;
                 <source
                   media="(prefers-reduced-motion: reduce) and (max-width: 440px)"
                   srcset={`${demo}-${theme}-mobile.png`}
-                  width="322"
-                  height="438"
+                  width={mobileSize[0]}
+                  height={mobileSize[1]}
                 />
                 <source
                   media="(prefers-reduced-motion: reduce)"
@@ -65,16 +74,16 @@ const prefix = `prototype-${kind}`;
                 <source
                   media="(max-width: 440px)"
                   srcset={`${demo}-${theme}-mobile.gif`}
-                  width="322"
-                  height="438"
+                  width={mobileSize[0]}
+                  height={mobileSize[1]}
                 />
                 <img
                   src={`${demo}-${theme}.gif`}
                   alt={demoAlt}
                   loading="lazy"
                   decoding="async"
-                  width="690"
-                  height="322"
+                  width={recordingSize[0]}
+                  height={recordingSize[1]}
                 />
               </picture>
             ))}
@@ -321,7 +330,7 @@ const prefix = `prototype-${kind}`;
     padding-top: 0;
   }
   @media (max-width: 440px) {
-    .sentence-abstraction-demo .demo-inner {
+    .prototype-demo .demo-inner {
       padding: 16px;
     }
     .sentence-abstraction-demo .walkthrough-caption {
