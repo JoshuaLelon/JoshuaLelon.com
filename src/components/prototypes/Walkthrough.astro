@@ -8,6 +8,7 @@ interface Props extends WalkthroughPageProps {
   demo?: string;
   demoAlt?: string;
   embeddedExplanations?: boolean;
+  features?: { feature: string; slide: number }[];
 }
 const {
   kind,
@@ -16,6 +17,7 @@ const {
   demo,
   demoAlt,
   embeddedExplanations = false,
+  features,
   recordingSize = [690, 322],
   mobileSize = [322, 438],
 } = Astro.props;
@@ -107,28 +109,71 @@ const prefix = `prototype-${kind}`;
       data-walk-panel
       hidden={showDemo}
     >
-      <section
-        class="walkthrough"
-        aria-label="Demo walkthrough"
-        hidden={embeddedExplanations}
-      >
-        <div class="walkthrough-caption" aria-live="polite" aria-atomic="true">
-          <strong></strong><p></p>
+      {
+        prototypePath && features && (
+          <nav class="feature-index" aria-label="feature index">
+            <table>
+              <thead>
+                <tr>
+                  <>
+                    <th scope="col">feature</th>
+                    <th scope="col">slide #</th>
+                  </>
+                </tr>
+              </thead>
+              <tbody>
+                {features.map(({ feature, slide: firstSlide }) => (
+                  <tr>
+                    <th scope="row">{feature}</th>
+                    <td>
+                      <a
+                        href={prototypePath + firstSlide + "/"}
+                        data-feature-slide={firstSlide}
+                        aria-label={feature + ", slide " + firstSlide}
+                        aria-current={firstSlide === slide ? "step" : undefined}
+                      >
+                        {firstSlide}
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </nav>
+        )
+      }
+      <div class="slide-column">
+        <section
+          class="walkthrough"
+          aria-label="Demo walkthrough"
+          hidden={embeddedExplanations}
+        >
+          <div
+            class="walkthrough-caption"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <strong></strong><p></p>
+          </div>
+        </section>
+        <div
+          class="tour-stage"
+          role="region"
+          aria-label="Demonstration"
+          tabindex="0"
+          data-pagefind-ignore
+        >
+          <slot />
         </div>
-      </section>
-      <div
-        class="tour-stage"
-        role="region"
-        aria-label="Demonstration"
-        tabindex="0"
-        data-pagefind-ignore
-      >
-        <slot />
-      </div>
-      <div class="walkthrough-nav" role="group" aria-label="Walkthrough steps">
-        <button data-back disabled>← Previous</button>
-        <span class="walkthrough-count"></span>
-        <button data-next disabled>Next →</button>
+        <div
+          class="walkthrough-nav"
+          role="group"
+          aria-label="Walkthrough steps"
+        >
+          <button data-back disabled>← Previous</button>
+          <span class="walkthrough-count"></span>
+          <button data-next disabled>Next →</button>
+        </div>
       </div>
     </div>
   </div>
@@ -257,6 +302,70 @@ const prefix = `prototype-${kind}`;
   }
   [hidden] {
     display: none !important;
+  }
+  .feature-index {
+    max-height: 10rem;
+    overflow: auto;
+    margin-bottom: 1rem;
+    scrollbar-width: thin;
+  }
+  .feature-index table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+  .feature-index th,
+  .feature-index td {
+    padding: 0.25rem 0.4rem;
+    text-align: start;
+  }
+  .feature-index thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--edge);
+    color: var(--secondary);
+  }
+  .feature-index tbody th {
+    font-weight: normal;
+  }
+  .feature-index :is(th, td):last-child {
+    text-align: end;
+    white-space: nowrap;
+  }
+  .feature-index a {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.6rem;
+    min-height: 1.6rem;
+    color: var(--green);
+    text-decoration: underline;
+    text-underline-offset: 0.17em;
+    font-variant-numeric: tabular-nums;
+  }
+  .feature-index tr:has([aria-current="step"]) {
+    background: var(--highlight);
+  }
+  .slide-column {
+    min-width: 0;
+  }
+  @media (min-width: 54rem) {
+    .demo-inner:has(.feature-index):has([data-walk-panel]:not([hidden])) {
+      max-width: 62rem;
+    }
+    [data-walk-panel]:has(.feature-index) {
+      display: grid;
+      grid-template-columns: minmax(12rem, 1fr) minmax(0, 3fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .feature-index {
+      max-height: 32rem;
+      margin-bottom: 0;
+    }
   }
   .prototype-tabs {
     display: flex;
