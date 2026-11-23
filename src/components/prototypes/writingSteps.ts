@@ -146,6 +146,7 @@ function recommendation(s: State): [Question, number] {
 // Each slide inherits only from the preceding authored slide.
 type Beat = {
   action?: string;
+  spokenSelection?: string;
   scroll?: Scroll;
   inspect?: string;
   foldOutlineFirst?: boolean;
@@ -260,7 +261,13 @@ const tour: Beat[] = [
     generated: '.beat[data-act="4"] .scene-prose',
     exit: '.beat[data-act="4"] .act-body > .beat-text',
     changes: { scenes: ["open", "undrafted", "open"] },
-    note: "the opening and ending now have prose. the writer follows the editor’s suggestion to act ii, the empty bakery.",
+    note: "the writer wants the moment the baker reveals the hatch. they use the microphone beneath the story to describe it.",
+  },
+  {
+    action: "select-by-voice",
+    spokenSelection: "the part where the baker moves the tray",
+    changes: { selected: whole, leaves: ["4/0"], question: "form" },
+    note: "the sentence where the baker slides the tray aside is selected. the writer follows the editor’s next suggestion to act ii.",
   },
   {
     action: "global",
@@ -810,6 +817,7 @@ export function writingSteps(root: HTMLElement): Step[] {
   let state = initial();
   let current = 0;
   let displayed = state;
+  const footer = work.querySelector<HTMLElement>(".selection-dictation")!;
   let menuEvents: AbortController | undefined;
   function closeMenu() {
     menuEvents?.abort();
@@ -971,7 +979,16 @@ export function writingSteps(root: HTMLElement): Step[] {
             ? work.querySelector<HTMLElement>(`[data-write="${beat.action}"]`)
             : null;
         if (hit) await animatePress(work, hit, tween);
-        const dictating = direction > 0 && beat.action === "redirect";
+        const dictating =
+          direction > 0 && beat.spokenSelection
+            ? "selection"
+            : direction > 0 && beat.action === "redirect"
+              ? "question"
+              : undefined;
+        if (dictating === "selection") {
+          footer.querySelector(".dictated-words")!.textContent =
+            "“" + beat.spokenSelection + "”";
+        }
         await animateDictation(scene, dictating, tween);
         // Let the spoken request register before crossfading to the new question.
         if (dictating) await tween(1000, () => {});
@@ -1181,7 +1198,7 @@ export function writingSteps(root: HTMLElement): Step[] {
         }
         if (dictating) {
           await tween(320, () => {});
-          await animateDictation(scene, false, tween);
+          await animateDictation(scene, undefined, tween);
         }
         if (beat.explainArc) {
           const answer = dock.querySelector<HTMLButtonElement>(

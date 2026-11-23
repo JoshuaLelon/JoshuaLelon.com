@@ -1,0 +1,41 @@
+---
+interface Props {
+  scope: "question" | "selection";
+}
+const { scope } = Astro.props;
+const label =
+  scope === "question" ? "dictate a question" : "select a passage by voice";
+---
+
+<div class="dictation-row" data-voice={scope}>
+  <p class="dictated-words" aria-live="polite">
+    {
+      scope === "question"
+        ? "“actually, i want to talk about the main character.”"
+        : ""
+    }
+  </p>
+  <button
+    class="dictation-mic"
+    type="button"
+    data-write={scope === "question" ? "redirect" : "select-by-voice"}
+    aria-label={label}
+    title={label}
+    disabled
+  >
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.7"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="2" width="6" height="13" rx="3"></rect>
+      <path d="M5.5 10.5v1a6.5 6.5 0 0 0 13 0v-1M12 18v4m-3 0h6"></path>
+    </svg>
+  </button>
+</div>

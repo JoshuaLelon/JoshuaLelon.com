@@ -487,11 +487,13 @@ export async function animatePress(
 // The dock gains exactly the space the mic travels. Its question and carousel stay anchored.
 export async function animateDictation(
   scene: HTMLElement,
-  spoken: boolean,
+  scope: "question" | "selection" | undefined,
   tween: Tween
 ) {
+  const spoken = Boolean(scope);
   if (!spoken && !scene.hasAttribute("data-dictating")) return;
-  const row = scene.querySelector<HTMLElement>(".decision-dock .dictation-row");
+  const voice = scope ?? scene.dataset.dictating;
+  const row = scene.querySelector<HTMLElement>(`[data-voice="${voice}"]`);
   if (!row) return;
   const words = row.querySelector<HTMLElement>(".dictated-words")!;
   const mic = row.querySelector<HTMLButtonElement>(".dictation-mic")!;
@@ -500,7 +502,7 @@ export async function animateDictation(
   const ink = Number(scene.style.getPropertyValue("--dictation-opacity"));
   const to = spoken ? words.offsetHeight + 6 : 0;
   const targetOpacity = Number(spoken);
-  scene.setAttribute("data-dictating", "");
+  scene.dataset.dictating = voice;
   mic.setAttribute("aria-pressed", String(spoken));
   if (from !== to || ink !== targetOpacity) {
     await tween(660, p => {

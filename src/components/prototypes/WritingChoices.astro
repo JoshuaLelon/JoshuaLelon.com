@@ -1,5 +1,6 @@
 ---
 import Walkthrough from "./Walkthrough.astro";
+import WritingMic from "./WritingMic.astro";
 import type { WalkthroughPageProps } from "./walkthrough";
 type Props = WalkthroughPageProps;
 ---
@@ -14,36 +15,7 @@ type Props = WalkthroughPageProps;
   mobileSize={[322, 572]}
 >
   <section class="writing-scene">
-    <template data-dictation>
-      <div class="dictation-row">
-        <p class="dictated-words">
-          “actually, i want to talk about the main character.”
-        </p>
-        <button
-          class="dictation-mic"
-          type="button"
-          data-write="redirect"
-          aria-label="dictate"
-          title="dictate"
-          disabled
-        >
-          <svg
-            width="19"
-            height="19"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.7"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <rect x="9" y="2" width="6" height="13" rx="3"></rect>
-            <path d="M5.5 10.5v1a6.5 6.5 0 0 0 13 0v-1M12 18v4m-3 0h6"></path>
-          </svg>
-        </button>
-      </div>
-    </template>
+    <template data-dictation><WritingMic scope="question" /></template>
     <div class="writing-workbench" aria-label="writing canvas">
       <div class="writing-pointer" aria-hidden="true" hidden>
         <svg width="23" height="29" viewBox="0 0 23 29" focusable="false">
@@ -58,6 +30,9 @@ type Props = WalkthroughPageProps;
       </div>
       <div class="selection-margin" aria-hidden="true"></div>
       <div class="draft-page" aria-label="document"></div>
+      <div class="selection-dictation">
+        <WritingMic scope="selection" />
+      </div>
       <div class="decision-dock" aria-label="writing choices"></div>
     </div>
     <div
@@ -94,7 +69,7 @@ type Props = WalkthroughPageProps;
     );
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr auto auto;
     font:
       14px/1.45 system-ui,
       sans-serif;
@@ -145,7 +120,7 @@ type Props = WalkthroughPageProps;
     z-index: 1;
     inset: 0 auto 0 0;
     width: var(--selection-rail);
-    grid-area: 1 / 1 / 2 / 2;
+    grid-area: 1 / 1 / 3 / 2;
     background: var(--canvas);
     border-inline-end: 1px solid var(--edge);
     opacity: 0;
@@ -545,7 +520,22 @@ type Props = WalkthroughPageProps;
     font-size: 16px;
     line-height: 1.42;
   }
+  .selection-dictation {
+    grid-area: 2 / 1;
+    padding: 0 12px 6px;
+  }
+  .writing-workbench:not(:has(.draft-tree)) .selection-dictation {
+    display: none;
+  }
+  .selection-dictation .dictation-row {
+    margin: 0;
+    padding-bottom: var(--dictation-space, 0px);
+  }
+  .selection-dictation .dictated-words {
+    min-height: 32px;
+  }
   .decision-dock {
+    grid-area: 3 / 1;
     --arrow-gap: clamp(16px, 3cqi, 22px);
     --preview-height: 44px;
     --heading-height: 62px;
@@ -599,7 +589,17 @@ type Props = WalkthroughPageProps;
       16px/1.5 system-ui,
       sans-serif;
   }
-  .writing-scene[data-dictating] .dictated-words {
+  .writing-scene:not([data-dictating="selection"]) [data-voice="selection"],
+  .writing-scene:not([data-dictating="question"]) [data-voice="question"] {
+    --dictation-space: 0px;
+    --dictation-opacity: 0;
+  }
+  .writing-scene[data-dictating="selection"]
+    [data-voice="selection"]
+    .dictated-words,
+  .writing-scene[data-dictating="question"]
+    [data-voice="question"]
+    .dictated-words {
     visibility: visible;
   }
   .decision-dock:empty {
