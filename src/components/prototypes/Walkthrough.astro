@@ -304,10 +304,7 @@ const prefix = `prototype-${kind}`;
     display: none !important;
   }
   .feature-index {
-    max-height: 10rem;
-    overflow: auto;
     margin-bottom: 1rem;
-    scrollbar-width: thin;
   }
   .feature-index table {
     width: 100%;
@@ -322,9 +319,6 @@ const prefix = `prototype-${kind}`;
     text-align: start;
   }
   .feature-index thead th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     background: var(--canvas);
     border-bottom: 1px solid var(--edge);
     color: var(--secondary);
@@ -363,7 +357,6 @@ const prefix = `prototype-${kind}`;
       align-items: start;
     }
     .feature-index {
-      max-height: 32rem;
       margin-bottom: 0;
     }
   }
