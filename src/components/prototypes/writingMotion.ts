@@ -103,11 +103,60 @@ function setupCarousel(dock: HTMLElement, list: HTMLElement) {
 // Compare authored controls, ignoring live scroll offsets, focus, and animation styles.
 const panelTemplates = new WeakMap<HTMLElement, Node>();
 
+function questionLabel(slot: HTMLElement) {
+  const text = slot.querySelector<HTMLElement>("h4, .preview-copy")!;
+  const rect = text.getBoundingClientRect();
+  const dock = slot.parentElement!.getBoundingClientRect();
+  const style = getComputedStyle(text);
+  return {
+    text,
+    x: rect.left - dock.left + rect.width / 2,
+    y: rect.top - dock.top + rect.height / 2,
+    size: parseFloat(style.fontSize),
+    weight: style.fontWeight,
+    color: style.color,
+    opacity: style.opacity,
+    backgroundColor: style.backgroundColor,
+    borderColor:
+      style.borderStyle === "none" ? "transparent" : style.borderColor,
+  };
+}
+
+function moveQuestion(
+  from: ReturnType<typeof questionLabel>,
+  slot: HTMLElement
+) {
+  const to = questionLabel(slot);
+  const frame = (label: typeof from) => ({
+    transform: `translate(${label.x - to.x}px, ${label.y - to.y}px) scale(${label.size / to.size})`,
+    opacity: label.opacity,
+    fontWeight: label.weight,
+    color: label.color,
+    backgroundColor: label.backgroundColor,
+    borderColor: label.borderColor,
+  });
+  slot.dataset.questionMoving = "";
+  const motion = to.text.animate([frame(from), frame(to)], {
+    id: "question-scroll",
+    duration: 1000,
+    fill: "both",
+  });
+  motion.pause();
+  return (progress: number) => {
+    motion.currentTime = progress * 1000;
+    if (progress === 1) {
+      motion.cancel();
+      delete slot.dataset.questionMoving;
+    }
+  };
+}
+
 export function preparePanelChange(
   dock: HTMLElement,
   content: DocumentFragment,
   reuse: boolean,
-  inspected?: string
+  inspected?: string,
+  scrollQuestions = false
 ) {
   const old = [...dock.children] as HTMLElement[];
   const next = [...content.children] as HTMLElement[];
@@ -128,26 +177,50 @@ export function preparePanelChange(
   const changesQuestion = Boolean(
     previousHeading && nextHeading && previousHeading !== nextHeading
   );
+  // Match by question identity across slots. Measure before and after the DOM swap.
+  const travelers = new Map<HTMLElement, HTMLElement>();
+  if (scrollQuestions) {
+    for (const to of nodes) {
+      if (!to.dataset.question) continue;
+      const from = old.find(
+        node => node.dataset.question === to.dataset.question
+      );
+      if (from && key(from) !== key(to)) travelers.set(to, from);
+    }
+  }
+  const movingFrom = new Set(travelers.values());
+  let moves: ReturnType<typeof moveQuestion>[] = [];
+  // The incoming question travels along the same axis as its preview.
+  const source = old.find(
+    node =>
+      node.dataset.direction &&
+      node.dataset.question === nextHeading?.dataset.question
+  )?.dataset.direction;
+  const dx = source === "left" ? -1 : source === "right" ? 1 : 0;
+  const dy = source === "up" ? -1 : source === "down" ? 1 : 0;
   const midpoint = !old.length
     ? 0
     : !nodes.length
       ? 1
-      : changesQuestion
-        ? 0.32
-        : 0.5;
+      : travelers.size
+        ? 0.15
+        : changesQuestion
+          ? 0.32
+          : 0.5;
   let outgoing: HTMLElement | undefined;
   let incoming: HTMLElement | undefined;
   let committed = false;
   function paint(progress: number, answers: number) {
     if (!committed && progress < midpoint) {
       for (const node of old) {
-        if (nodes.includes(node)) continue;
+        if (nodes.includes(node) || movingFrom.has(node)) continue;
         if (changesQuestion && node === previousHeading) {
           node.style.opacity = String(1 - phase(progress, 0, 0.68));
           continue;
         }
         const keepVisible =
           nextKeys.has(key(node)) &&
+          !node.classList.contains("question-preview") &&
           !(changesQuestion && node.classList.contains("choice-window"));
         node.style.opacity = String(
           1 - (progress / midpoint) * (keepVisible ? 0.5 : 1)
@@ -157,8 +230,21 @@ export function preparePanelChange(
       return;
     }
     if (!committed) {
+      const departures =
+        progress < 1
+          ? [...travelers].map(([to, from]) => ({
+              to,
+              from: questionLabel(from),
+            }))
+          : [];
       // Both wordings occupy the same heading slot during the handoff.
-      if (changesQuestion && nextHeading && previousHeading && progress < 1) {
+      if (
+        !travelers.size &&
+        changesQuestion &&
+        nextHeading &&
+        previousHeading &&
+        progress < 1
+      ) {
         outgoing = document.createElement("span");
         outgoing.textContent =
           previousHeading.querySelector("h4")!.getAttribute("aria-label") ??
@@ -176,6 +262,7 @@ export function preparePanelChange(
         const slot = dock.children[i];
         if (slot !== node) dock.insertBefore(node, slot ?? null);
       });
+      moves = departures.map(({ to, from }) => moveQuestion(from, to));
       const list = dock.querySelector<HTMLElement>(".choice-list");
       if (list !== previousList) {
         if (list) {
@@ -186,17 +273,22 @@ export function preparePanelChange(
       committed = true;
     }
     dock.style.opacity = old.length ? "1" : String(progress);
+    for (const move of moves) move((progress - midpoint) / (1 - midpoint));
+    if (progress === 1) moves = [];
     for (const node of nodes) {
+      if (travelers.has(node)) continue;
       if (node === nextHeading && progress === 1) {
         const heading = node.querySelector("h4")!;
         if (heading.childElementCount)
           heading.textContent = heading.getAttribute("aria-label");
       }
       if (node === nextHeading && outgoing && incoming) {
-        outgoing.style.opacity = String(1 - phase(progress, 0, 0.68));
-        incoming.style.opacity = String(
-          phase(progress, midpoint, 1 - midpoint)
-        );
+        const leaving = phase(progress, 0, 0.68);
+        const arriving = phase(progress, midpoint, 1 - midpoint);
+        outgoing.style.opacity = String(1 - leaving);
+        incoming.style.opacity = String(arriving);
+        outgoing.style.translate = `${-dx * 12 * leaving}px ${-dy * 9 * leaving}px`;
+        incoming.style.translate = `${dx * 12 * (1 - arriving)}px ${dy * 9 * (1 - arriving)}px`;
         continue;
       }
       if (old.includes(node)) {
@@ -205,6 +297,7 @@ export function preparePanelChange(
       }
       const start =
         oldByKey.has(key(node)) &&
+        !node.classList.contains("question-preview") &&
         !(changesQuestion && node.classList.contains("choice-window"))
           ? 0.5
           : 0;

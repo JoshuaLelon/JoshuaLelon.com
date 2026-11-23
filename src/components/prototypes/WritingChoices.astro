@@ -668,6 +668,10 @@ type Props = WalkthroughPageProps;
     text-align: center;
     text-wrap: balance;
   }
+  .decision-dock > [data-question-moving] {
+    z-index: 2;
+    pointer-events: none;
+  }
   [data-theme="dark"] .question-preview {
     --preview-opacity: 0.115;
   }

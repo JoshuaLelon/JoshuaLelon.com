@@ -885,6 +885,13 @@ export function writingSteps(root: HTMLElement): Step[] {
       target: null,
       result: null,
       prepare(animate) {
+        for (const slot of dock.querySelectorAll<HTMLElement>(
+          "[data-question-moving]"
+        )) {
+          for (const motion of slot.getAnimations({ subtree: true }))
+            if (motion.id === "question-scroll") motion.cancel();
+          delete slot.dataset.questionMoving;
+        }
         const pointer = work.querySelector<HTMLElement>(".writing-pointer")!;
         pointer.hidden = true;
         delete pointer.dataset.scroll;
@@ -978,7 +985,8 @@ export function writingSteps(root: HTMLElement): Step[] {
           dock,
           panelContents(root, slide, help.trigger),
           direction !== 0,
-          slide.inspected[slide.question]
+          slide.inspected[slide.question],
+          scrollingQuestions
         );
         const selectionGesture = (undo ?? beat).scroll;
         const near =
