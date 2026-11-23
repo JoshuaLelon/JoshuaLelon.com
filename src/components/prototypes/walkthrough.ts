@@ -28,6 +28,9 @@ export function walkthrough(
   const caption = panel.querySelector<HTMLElement>(".walkthrough-caption")!;
   const back = root.querySelector<HTMLButtonElement>("[data-back]")!;
   const next = root.querySelector<HTMLButtonElement>("[data-next]")!;
+  const featureLinks = root.querySelectorAll<HTMLAnchorElement>(
+    "[data-feature-slide]"
+  );
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let index = initialSlide - 1,
     running = false,
@@ -44,12 +47,17 @@ export function walkthrough(
   }
   function controls() {
     stage.setAttribute("aria-busy", String(running));
+    for (const link of featureLinks) {
+      if (Number(link.dataset.featureSlide) === index + 1)
+        link.setAttribute("aria-current", "step");
+      else link.removeAttribute("aria-current");
+    }
     back.disabled = index === 0;
     next.disabled = running || index === steps.length - 1;
     root.querySelector(".walkthrough-count")!.textContent =
       `${index + 1} / ${steps.length}`;
   }
-  async function show(animate = true) {
+  async function show(animate = true, replay = false) {
     if (!stage.clientWidth) return;
     clear();
     controller = new AbortController();
@@ -58,7 +66,6 @@ export function walkthrough(
     running = true;
     controls();
     text(step.title, step.description);
-    step.prepare(animate);
     const cue = (element: Element | null, kind: "action" | "result") => {
       signal.throwIfAborted();
       root
@@ -103,6 +110,21 @@ export function walkthrough(
         frame = requestAnimationFrame(tick);
       });
     try {
+      // A jump can start anywhere. Restore the preceding authored state before
+      // playing a gesture that needs its original text, selection, or controls.
+      if (replay && index > 0) {
+        const previous = steps[index - 1];
+        previous.prepare(false);
+        await previous.run({
+          tween: async (_, update) => {
+            signal.throwIfAborted();
+            update(1);
+          },
+          cue,
+        });
+        signal.throwIfAborted();
+      }
+      step.prepare(animate);
       cue(step.target, "action");
       if (step.target) await tween(550, () => {});
       signal.throwIfAborted();
@@ -137,6 +159,22 @@ export function walkthrough(
       (direction === 1 ? back : next).focus({ preventScroll: true });
     }
   }
+  for (const link of featureLinks) {
+    link.onclick = event => {
+      if (
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      )
+        return;
+      event.preventDefault();
+      index = Number(link.dataset.featureSlide) - 1;
+      onNavigate(index + 1);
+      void show(true, true);
+    };
+  }
   back.onclick = event => {
     void navigate(-1, event);
   };
@@ -164,6 +202,7 @@ export function walkthrough(
     clear();
     back.onclick = null;
     next.onclick = null;
+    for (const link of featureLinks) link.onclick = null;
     reduced.removeEventListener("change", onMotionChange);
     document.removeEventListener("visibilitychange", onVisibility);
     resize.disconnect();

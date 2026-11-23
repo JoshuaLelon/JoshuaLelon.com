@@ -153,6 +153,7 @@ function recommendation(s: State): [Question, number] {
 }
 // Each slide inherits only from the preceding authored slide.
 type Beat = {
+  features?: string[];
   action?: string;
   spokenSelection?: string;
   saveVersion?: { branch: VersionKey; choice: number };
@@ -172,11 +173,13 @@ const tour: Beat[] = [
     note: "the writer opens a blank page with no plot in mind.",
   },
   {
+    features: ["one question at a time", "document type choices"],
     enter: ".blank-sheet",
     changes: { visible: true },
     note: "the writer picks “story” to get a premise to react to.",
   },
   {
+    features: ["generate a premise"],
     action: "kind/story",
     exit: ".blank-sheet",
     generated: ".premise-row",
@@ -184,6 +187,7 @@ const tour: Beat[] = [
     note: "the writer scrolls through the genres and chooses “ghost story” to try a supernatural premise.",
   },
   {
+    features: ["shape the premise by genre"],
     action: "lens/1",
     generated: ".premise-row",
     saveVersion: { branch: "outline", choice: 1 },
@@ -191,21 +195,25 @@ const tour: Beat[] = [
     note: "the writer checks what an emotional arc is, then looks up “rise, fall, rise” to see how it might read.",
   },
   {
+    features: ["look up definitions and examples"],
     explainArc: true,
     note: "the writer leaves the arc undecided and uses the microphone to ask about nell first.",
   },
   {
+    features: ["redirect a question by voice"],
     action: "redirect",
     changes: { question: "fact" },
     note: "the writer chooses “skeptic” for nell. the editor will keep that choice with her name.",
   },
   {
+    features: ["attach a character fact to a name"],
     action: "fact/0",
     enter: ".term-annotation",
     changes: { fact: 0, question: "premise" },
     note: "with nell’s character set, the writer opens the ghost story dropdown and chooses “mystery” to try the same premise in another genre.",
   },
   {
+    features: ["change genre from the draft"],
     action: "genre/lens/0",
     generated: ".premise-row",
     saveVersion: { branch: "outline", choice: 0 },
@@ -213,6 +221,7 @@ const tour: Beat[] = [
     note: "the writer chooses “rise, fall, rise” to expand the mystery version into three acts.",
   },
   {
+    features: ["generate an outline from an arc"],
     action: `arc/${mysteryArc}`,
     generated: ".beat",
     exit: ".premise-text",
@@ -220,25 +229,30 @@ const tour: Beat[] = [
     note: "the writer folds the three acts to read the premise on its own, then reopens them with the same chevron.",
   },
   {
+    features: ["fold and reopen the outline"],
     action: "show/outline",
     foldOutlineFirst: true,
     enter: ".beat-list",
     note: "the writer scrolls across the possible narrators to see whose perspective could carry the story.",
   },
   {
+    features: ["browse answers without choosing"],
     scroll: { zone: "answers", direction: "right" },
     inspect: "third-person limited",
     note: "“third-person limited” is in view. the writer moves up to the question and scrolls up to see which other story decisions are available.",
   },
   {
+    features: ["go to a broader question"],
     scroll: { zone: "question", direction: "up" },
     note: "“point of view” marks the question the writer came from. scrolling down over the heading returns to it.",
   },
   {
+    features: ["return to a question and its last answer"],
     scroll: { zone: "question", direction: "down" },
     note: "“third-person limited” is still in view. this time the writer scrolls right over the question itself to visit a question at the same level.",
   },
   {
+    features: ["move between sibling questions"],
     scroll: { zone: "question", direction: "right" },
     note: "the question now asks about the emotional arc. scrolling up from here opens the same list of story decisions, this time at “emotional arc.”",
   },
@@ -256,18 +270,21 @@ const tour: Beat[] = [
     note: "the outline is already open. the writer scrolls down over the story to grow its first leaf, the moment nell hears the letter land.",
   },
   {
+    features: ["expand a summary into prose"],
     scroll: { zone: "essay", direction: "down" },
     generated: '.beat[data-act="1"] .scene-prose',
     exit: '.beat[data-act="1"] .act-body > .beat-text',
     note: "act i’s summary gives way to its prose. nell writes down the time. the writer scrolls down again over that sentence to get a more specific detail.",
   },
   {
+    features: ["expand a sentence into detail"],
     scroll: { zone: "essay", direction: "down" },
     generated: '[data-child-of="1/lead"]',
     exit: '.passage-lead [data-leaf="1/lead"] > :not(.branch-marker)',
     note: "the time appears in nell’s collection book. the writer uses the sparkle beside act iii to grow the ending as well.",
   },
   {
+    features: ["draft an individual scene"],
     action: "expand/4",
     generated: '.beat[data-act="4"] .scene-prose',
     exit: '.beat[data-act="4"] .act-body > .beat-text',
@@ -275,27 +292,32 @@ const tour: Beat[] = [
     note: "the writer wants the moment the baker reveals the hatch. they use the microphone beneath the story to describe it.",
   },
   {
+    features: ["select a passage by voice"],
     action: "select-by-voice",
     spokenSelection: "the part where the baker moves the tray",
     changes: { selected: whole, leaves: ["4/0"], question: "form" },
     note: "the sentence where the baker slides the tray aside is selected. the writer follows the editor’s next suggestion to act ii.",
   },
   {
+    features: ["follow the next suggested edit"],
     action: "global",
     changes: { selected: 2, leaves: [], question: "viewpoint" },
     note: "act ii is highlighted. scrolling right in the margin keeps it and adds one nearby sentence about nell’s hope that someone remembered.",
   },
   {
+    features: ["extend a selection in the margin"],
     scroll: { zone: "margin", direction: "right" },
     changes: { leaves: ["1/2"] },
     note: "the writer scrolls down in the same margin for a different selection. this time they land on two clues, one in the opening and one in the ending.",
   },
   {
+    features: ["switch to a different group of passages"],
     scroll: { zone: "margin", direction: "down" },
     changes: { selected: whole, leaves: ["1/0", "4/0"], question: "form" },
     note: "the slot is bolted in act i. the baker reveals the hatch in act iii. with both sentences selected, the writer scrolls up over the prose to fold the upper scene.",
   },
   {
+    features: ["track selections inside folded prose"],
     scroll: { zone: "essay", direction: "up" },
     note: "act i’s underlined summary marks the hidden selection. act iii’s sentence is still highlighted. scrolling down over the essay reopens act i.",
   },
@@ -304,11 +326,13 @@ const tour: Beat[] = [
     note: "the same two sentences are highlighted again. the writer opens the “concrete detail” label above “hit the tin floor” to work on that phrase.",
   },
   {
+    features: ["target a phrase by its label"],
     action: "device/1",
     changes: { question: "form", selected: 1, leaves: [] },
     note: "the highlight narrows to the wording the editor will rewrite. the writer chooses “simile” to change how the falling envelope sounds.",
   },
   {
+    features: ["rewrite a phrase in another form"],
     action: "form/2",
     inspect: "simile",
     generated: ".annotated-form[data-editing]",
@@ -341,6 +365,17 @@ const tour: Beat[] = [
   },
 ];
 export const writingSlideCount = tour.length;
+const firstSlideByFeature = new Map<string, number>();
+for (const [index, beat] of tour.entries()) {
+  for (const feature of beat.features ?? []) {
+    if (!firstSlideByFeature.has(feature))
+      firstSlideByFeature.set(feature, index + 1);
+  }
+}
+export const writingFeatureIndex = Array.from(
+  firstSlideByFeature,
+  ([feature, slide]) => ({ feature, slide })
+);
 
 type Choice = [string, string?];
 const alternatives = (...names: string[]): Choice[] =>

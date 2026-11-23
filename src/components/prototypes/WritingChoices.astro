@@ -1,6 +1,7 @@
 ---
 import Walkthrough from "./Walkthrough.astro";
 import WritingMic from "./WritingMic.astro";
+import { writingFeatureIndex } from "./writingSteps";
 import type { WalkthroughPageProps } from "./walkthrough";
 type Props = WalkthroughPageProps;
 ---
@@ -11,6 +12,7 @@ type Props = WalkthroughPageProps;
   demo="/assets/prototypes/one-choice-at-a-time"
   demoAlt="a blank page becomes a short mystery as a writer chooses a genre, records a character, expands an outline, and tries another version of the opening."
   embeddedExplanations
+  features={writingFeatureIndex}
   recordingSize={[690, 474]}
   mobileSize={[322, 572]}
 >
