@@ -13,6 +13,7 @@ import {
   pendingRevision,
   moveTermLabel,
   revealTarget,
+  revealInViewport,
 } from "./writingMotion";
 
 type Question =
@@ -447,14 +448,21 @@ function openTaxonomyMenu(trigger: HTMLElement, s: State, help: HelpTrigger) {
     );
   }
   trigger.setAttribute("aria-expanded", "true");
-  trigger.after(menu);
+  const tree = trigger.closest<HTMLElement>(".draft-tree")!;
+  const origin = tree.getBoundingClientRect();
+  const anchor = trigger.parentElement!.getBoundingClientRect();
+  // Sharing the story's grid cell lets the whole draft grow to the menu's bottom.
+  tree.append(menu);
   const page = trigger.closest(".draft-page")!.getBoundingClientRect();
-  const bounds = menu.getBoundingClientRect();
+  const width = menu.getBoundingClientRect().width;
+  const preferredLeft = isGenre || isAct ? anchor.right - width : anchor.left;
   const left = Math.max(
     page.left + 4,
-    Math.min(bounds.left, page.right - bounds.width - 4)
+    Math.min(preferredLeft, page.right - width - 4)
   );
-  menu.style.translate = `${left - bounds.left}px 0`;
+  menu.style.marginInlineStart = left - origin.left + "px";
+  menu.style.marginBlockStart = anchor.bottom - origin.top + 5 + "px";
+  revealInViewport(menu);
   return menu;
 }
 function renderDraft(root: HTMLElement, s: State) {

@@ -211,7 +211,7 @@ export function preparePanelChange(
 
 export async function revealTarget(target: HTMLElement, tween: Tween) {
   const scroller = target.closest<HTMLElement>(".choice-list, .draft-page");
-  if (!scroller) return;
+  if (!scroller || scroller === target) return;
   const horizontal = scroller.classList.contains("choice-list");
   const box = scroller.getBoundingClientRect();
   const item = target.getBoundingClientRect();
@@ -231,12 +231,27 @@ export async function revealTarget(target: HTMLElement, tween: Tween) {
   });
 }
 
+export function revealInViewport(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  if (rect.top >= 0 && rect.bottom <= window.innerHeight) return;
+  element.scrollIntoView({
+    block: "nearest",
+    inline: "nearest",
+    behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? "instant"
+      : "smooth",
+  });
+}
+
 export async function aimPointer(
   work: HTMLElement,
   target: HTMLElement,
   tween: Tween,
   from?: HTMLElement
 ) {
+  revealInViewport(
+    target.closest<HTMLElement>(".genre-menu, .decision-dock") ?? target
+  );
   const pointer = work.querySelector<HTMLElement>(".writing-pointer")!;
   const glyph = pointer.querySelector("svg")!;
   const area = work.getBoundingClientRect();
@@ -265,8 +280,9 @@ export async function aimPointer(
   );
 
   const bounds = target.getBoundingClientRect();
-  const dx = bounds.left + bounds.width / 2 - area.left - startX;
-  const dy = bounds.top + bounds.height / 2 - area.top - startY;
+  const canvas = work.getBoundingClientRect();
+  const dx = bounds.left + bounds.width / 2 - canvas.left - startX;
+  const dy = bounds.top + bounds.height / 2 - canvas.top - startY;
   // A shallow arc and a brief dwell separate aiming from pressing.
   await tween(690, p => {
     const t = smooth(p);
@@ -424,6 +440,8 @@ export function moveTermLabel(label?: HTMLElement | null, from?: DOMRect) {
   };
 }
 export async function pendingRevision(targets: HTMLElement[], tween: Tween) {
+  const page = targets[0].closest<HTMLElement>(".draft-page")!;
+  const menu = page.querySelector<HTMLElement>(".genre-menu");
   const labels = new Map<
     string,
     { text: string; bracket?: DOMRect; term?: DOMRect }
@@ -445,17 +463,15 @@ export async function pendingRevision(targets: HTMLElement[], tween: Tween) {
     }
   }
   await tween(760, p => {
+    if (menu) menu.style.opacity = String(1 - phase(p, 0, 0.35));
     for (const target of targets) {
       target.style.setProperty(
         "--prose-opacity",
         String(1 - 0.48 * phase(p, 0, 0.38))
       );
-      const menu = target.querySelector<HTMLElement>(".genre-menu");
-      if (menu) menu.style.opacity = String(1 - phase(p, 0, 0.35));
     }
   });
   // A visual copy retains the original line breaks while the replacement arrives.
-  const page = targets[0].closest<HTMLElement>(".draft-page")!;
   for (const target of targets) target.dataset.revisionSource = "";
   const overlay = document.createElement("div");
   overlay.className = "revision-overlay";

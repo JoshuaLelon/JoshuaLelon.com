@@ -84,10 +84,12 @@ type Props = WalkthroughPageProps;
   .writing-workbench {
     position: relative;
     isolation: isolate;
-    height: calc(var(--workbench-height, 474px) + var(--dictation-space, 0px));
+    min-height: calc(
+      var(--workbench-height, 474px) + var(--dictation-space, 0px)
+    );
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: 1fr auto;
     font:
       14px/1.45 system-ui,
       sans-serif;
@@ -178,8 +180,6 @@ type Props = WalkthroughPageProps;
     position: relative;
     --selection-fill: #d4e6c2;
     align-content: start;
-    overflow: auto;
-    scrollbar-width: thin;
     padding: 24px 32px;
   }
   .draft-page p,
@@ -230,8 +230,14 @@ type Props = WalkthroughPageProps;
     );
   }
   .draft-tree {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     --disclosure-width: 20px;
     --bracket-ink: var(--secondary);
+  }
+  .draft-tree > :is(.premise-row, .genre-menu) {
+    grid-area: 1 / 1;
   }
   .sentence-annotation {
     display: inline-grid;
@@ -329,9 +335,8 @@ type Props = WalkthroughPageProps;
     transform: rotate(225deg);
   }
   .genre-menu {
-    position: absolute;
     z-index: 2;
-    inset: calc(100% + 5px) 0 auto auto;
+    justify-self: start;
     display: grid;
     width: max-content;
     min-width: 132px;
@@ -374,9 +379,6 @@ type Props = WalkthroughPageProps;
   .term-annotation::before,
   .term-annotation > .term-label {
     translate: var(--term-x, 0px) var(--term-y, 0px);
-  }
-  .term-annotation > .genre-menu {
-    inset: calc(100% + 4px) auto auto 0;
   }
   .writing-scene .term-label {
     position: absolute;
