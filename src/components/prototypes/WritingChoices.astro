@@ -546,8 +546,22 @@ type Props = WalkthroughPageProps;
     line-height: 1.42;
   }
   .decision-dock {
-    padding: 8px 24px
-      calc(var(--dock-inset, 16px) + var(--dictation-space, 0px));
+    --arrow-gap: clamp(16px, 3cqi, 22px);
+    --preview-height: 44px;
+    --heading-height: 62px;
+    --actions-height: 30px;
+    display: grid;
+    isolation: isolate;
+    grid-template-columns:
+      minmax(0, 1fr) minmax(0, clamp(148px, 40cqi, 290px))
+      minmax(0, 1fr);
+    /* Keep both preview tracks even when a question has no neighbor. */
+    grid-template-rows:
+      var(--actions-height) var(--preview-height) var(--arrow-gap)
+      minmax(var(--heading-height), auto) auto auto
+      var(--arrow-gap) var(--preview-height);
+    column-gap: var(--arrow-gap);
+    padding: 6px 24px 9px;
     background: var(--canvas);
     border-top: 1px solid var(--edge);
   }
@@ -608,6 +622,116 @@ type Props = WalkthroughPageProps;
       monospace;
     color: var(--secondary);
   }
+  .decision-dock::before {
+    content: "";
+    grid-area: 4 / 2 / 7 / 3;
+    z-index: -1;
+    border: 1px solid var(--edge);
+    border-radius: 9px;
+    background: var(--paper);
+  }
+  .decision-head {
+    grid-area: 1 / 1 / 2 / -1;
+  }
+  .decision-dock > .question-line {
+    grid-area: 4 / 2;
+    align-self: center;
+    min-width: 0;
+    max-width: calc(100% - 46px);
+    position: relative;
+    margin: 10px auto 7px;
+  }
+  .question-line > .writing-help {
+    position: absolute;
+    inset: 0 auto auto 100%;
+  }
+  .decision-dock > .choice-window {
+    grid-area: 5 / 2;
+    width: min(calc(100% - 16px), 33.333cqi);
+    --rail-edge: var(--paper);
+  }
+  .decision-dock > .dictation-row {
+    grid-area: 6 / 2;
+    padding-bottom: 4px;
+    margin-bottom: var(--dictation-space, 0px);
+  }
+  .question-preview {
+    --preview-opacity: 0.14;
+    position: relative;
+    width: fit-content;
+    max-width: 100%;
+    align-self: center;
+    color: var(--secondary);
+    font:
+      12px/1.3 system-ui,
+      sans-serif;
+    text-align: center;
+    text-wrap: balance;
+  }
+  [data-theme="dark"] .question-preview {
+    --preview-opacity: 0.115;
+  }
+  /* The parent fades between questions. Keep the resting opacity on its children. */
+  .question-preview > :is(.preview-copy, .preview-arrow) {
+    opacity: var(--preview-opacity);
+  }
+  @media (prefers-contrast: more), (forced-colors: active) {
+    .question-preview > :is(.preview-copy, .preview-arrow) {
+      opacity: 1;
+    }
+  }
+  .preview-copy {
+    display: block;
+    padding: 5px 8px;
+    border: 1px solid var(--edge);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--paper) 55%, var(--canvas));
+  }
+  /* Each chevron sits halfway across the gutter, pointing away from the center. */
+  .preview-arrow {
+    position: absolute;
+    top: var(--arrow-y, 50%);
+    left: var(--arrow-x, 50%);
+    width: 6px;
+    height: 6px;
+    translate: -50% -50%;
+    rotate: var(--arrow-angle);
+    border: solid currentColor;
+    border-width: 1.5px 1.5px 0 0;
+    pointer-events: none;
+  }
+  .preview-left,
+  .preview-right {
+    width: min(100%, 154px);
+  }
+  .preview-left {
+    grid-area: 4 / 1 / 7 / 2;
+    justify-self: end;
+    --arrow-x: calc(100% + var(--arrow-gap) / 2);
+    --arrow-angle: -135deg;
+  }
+  .preview-right {
+    grid-area: 4 / 3 / 7 / 4;
+    justify-self: start;
+    --arrow-x: calc(0px - var(--arrow-gap) / 2);
+    --arrow-angle: 45deg;
+  }
+  .preview-up,
+  .preview-down {
+    justify-self: center;
+  }
+  .preview-up {
+    grid-area: 2 / 2;
+    align-self: end;
+    --arrow-y: calc(100% + var(--arrow-gap) / 2);
+    --arrow-angle: -45deg;
+  }
+  .preview-down {
+    grid-area: 8 / 2;
+    align-self: start;
+    --arrow-y: calc(0px - var(--arrow-gap) / 2);
+    --arrow-angle: 135deg;
+  }
   .question-line {
     display: flex;
     width: fit-content;
@@ -648,7 +772,7 @@ type Props = WalkthroughPageProps;
     width: var(--fade-left, 0px);
     background: linear-gradient(
       to right,
-      var(--canvas),
+      var(--rail-edge, var(--canvas)),
       transparent
     );
   }
@@ -657,7 +781,7 @@ type Props = WalkthroughPageProps;
     width: var(--fade-right, 0px);
     background: linear-gradient(
       to left,
-      var(--canvas),
+      var(--rail-edge, var(--canvas)),
       transparent
     );
   }
@@ -960,14 +1084,33 @@ type Props = WalkthroughPageProps;
     color: var(--secondary);
     text-wrap: balance;
   }
+  @container (max-width: 600px) {
+    .decision-dock {
+      --heading-height: 84px;
+    }
+  }
   @container (max-width: 455px) {
     .writing-workbench {
       --workbench-height: 572px;
     }
 
     .decision-dock {
-      --dock-inset: 12px;
-      padding-inline: 12px;
+      --heading-height: 106px;
+      --preview-height: 54px;
+      --actions-height: 44px;
+      padding-inline: 5px;
+    }
+    .decision-dock > .choice-window {
+      width: calc(100% - 10px);
+    }
+    .decision-dock > .question-line {
+      max-width: calc(100% - 38px);
+    }
+    .question-preview {
+      font-size: 11px;
+    }
+    .preview-copy {
+      padding: 5px 3px;
     }
     .draft-page,
     .selection-margin {

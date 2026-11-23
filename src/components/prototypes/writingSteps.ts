@@ -740,6 +740,31 @@ function panelContents(
   }
   if (controls.childElementCount) head.append(controls);
   if (head.childElementCount) panel.append(head);
+  const directions = {
+    left: "previous question",
+    right: "next question",
+    up: "broader question",
+    down: "narrower question",
+  };
+  for (const [direction, question] of Object.entries(questionNeighbors(s))) {
+    if (!question) continue;
+    const preview = el("div", `question-preview preview-${direction}`);
+    preview.dataset.question = question;
+    preview.dataset.direction = direction;
+    const [prompt] = options({ ...s, question });
+    const arrow = el("span", "preview-arrow");
+    arrow.setAttribute("aria-hidden", "true");
+    preview.append(
+      arrow,
+      el(
+        "span",
+        "sr-only",
+        directions[direction as Scroll["direction"]] + ". "
+      ),
+      el("span", "preview-copy", prompt)
+    );
+    panel.append(preview);
+  }
   const [prompt, choices] = options(s);
   const list = el("div", "choice-list");
   const strip = el("div", "choice-window");
@@ -764,6 +789,7 @@ function panelContents(
     explain(prompt),
     "question-line"
   );
+  heading.dataset.question = s.question;
   panel.append(heading, strip);
   list.setAttribute("aria-label", `Answers to “${prompt}”`);
   const template = root.querySelector<HTMLTemplateElement>(
