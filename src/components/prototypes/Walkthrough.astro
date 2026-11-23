@@ -1,5 +1,7 @@
 ---
-interface Props {
+import type { WalkthroughPageProps } from "./walkthrough";
+
+interface Props extends WalkthroughPageProps {
   kind: "sentence-abstraction" | "one-choice-at-a-time";
   recordingSize?: [number, number];
   mobileSize?: [number, number];
@@ -9,17 +11,22 @@ interface Props {
 }
 const {
   kind,
+  slide,
+  prototypePath,
   demo,
   demoAlt,
   embeddedExplanations = false,
   recordingSize = [690, 322],
   mobileSize = [322, 438],
 } = Astro.props;
+const showDemo = Boolean(demo) && slide === undefined;
 const prefix = `prototype-${kind}`;
 ---
 
 <prototype-walkthrough
   data-kind={kind}
+  data-prototype-path={prototypePath}
+  data-slide={slide}
   data-has-demo={Boolean(demo)}
   data-embedded-explanations={embeddedExplanations}
   class:list={["prototype-demo experiment-stage not-prose", `${kind}-demo`]}
@@ -37,7 +44,8 @@ const prefix = `prototype-${kind}`;
               role="tab"
               id={`${prefix}-demo-tab`}
               aria-controls={`${prefix}-demo-panel`}
-              aria-selected="true"
+              aria-selected={showDemo}
+              tabindex={showDemo ? 0 : -1}
               data-view="demo"
             >
               demo
@@ -46,8 +54,8 @@ const prefix = `prototype-${kind}`;
               role="tab"
               id={`${prefix}-walk-tab`}
               aria-controls={`${prefix}-walk-panel`}
-              aria-selected="false"
-              tabindex="-1"
+              aria-selected={!showDemo}
+              tabindex={showDemo ? -1 : 0}
               data-view="walk"
             >
               walk through
@@ -57,6 +65,7 @@ const prefix = `prototype-${kind}`;
             id={`${prefix}-demo-panel`}
             role="tabpanel"
             aria-labelledby={`${prefix}-demo-tab`}
+            hidden={!showDemo}
             data-demo-panel
           >
             {["light", "dark"].map(theme => (
@@ -96,7 +105,7 @@ const prefix = `prototype-${kind}`;
       role={demo ? "tabpanel" : undefined}
       aria-labelledby={demo ? `${prefix}-walk-tab` : undefined}
       data-walk-panel
-      hidden={Boolean(demo)}
+      hidden={showDemo}
     >
       <section
         class="walkthrough"
@@ -147,9 +156,10 @@ const prefix = `prototype-${kind}`;
         walkPanel.hidden = tab.dataset.view !== "walk";
         if (demoPanel) demoPanel.hidden = !walkPanel.hidden;
         if (!walkPanel.hidden) {
-          this.initialize();
-          this.controller?.refresh();
+          if (this.controller) this.controller.refresh();
+          else this.initialize();
         }
+        this.updateUrl(walkPanel.hidden ? undefined : this.controller?.slide);
       };
       tabs.forEach((tab, index) => {
         tab.addEventListener("click", () => select(tab), {
@@ -176,7 +186,19 @@ const prefix = `prototype-${kind}`;
           { signal: this.events!.signal }
         );
       });
-      if (!walkPanel.hidden) this.initialize();
+      if (!walkPanel.hidden) {
+        if (this.dataset.slide && !location.hash)
+          this.scrollIntoView({ block: "start", behavior: "instant" });
+        this.initialize();
+      }
+    }
+    private updateUrl(slide?: number) {
+      const path = this.dataset.prototypePath;
+      if (!path) return; // Gallery embeds share a page.
+      const url = new URL(location.href);
+      url.pathname = slide ? path + slide + "/" : path;
+      if (url.href !== location.href)
+        history.replaceState(history.state, "", url);
     }
     private initialize() {
       if (this.controller) return;
@@ -184,7 +206,9 @@ const prefix = `prototype-${kind}`;
         this,
         this.dataset.kind === "one-choice-at-a-time"
           ? writingSteps(this)
-          : sentenceAbstractionSteps(this)
+          : sentenceAbstractionSteps(this),
+        Number(this.dataset.slide ?? 1),
+        slide => this.updateUrl(slide)
       );
     }
     disconnectedCallback() {

@@ -33,7 +33,9 @@ export default defineConfig({
     mdx(),
     sitemap({
       filter: page =>
-        config.features?.showArchives !== false || !/\/archives\/?$/.test(page),
+        !/\/prototypes\/.+\/\d+\/?$/.test(page) &&
+        (config.features?.showArchives !== false ||
+          !/\/archives\/?$/.test(page)),
     }),
   ],
 

@@ -1,3 +1,7 @@
+export interface WalkthroughPageProps {
+  prototypePath?: string;
+  slide?: number;
+}
 export type Tween = (
   duration: number,
   update: (progress: number) => void
@@ -5,7 +9,7 @@ export type Tween = (
 export interface Step {
   title: string;
   description: string;
-  prepare: () => void;
+  prepare: (animate: boolean) => void;
   target: Element | null;
   result: Element | null;
   run: (context: {
@@ -13,14 +17,19 @@ export interface Step {
     cue: (element: Element | null, kind: "action" | "result") => void;
   }) => Promise<void>;
 }
-export function walkthrough(root: HTMLElement, steps: Step[]) {
+export function walkthrough(
+  root: HTMLElement,
+  steps: Step[],
+  initialSlide: number,
+  onNavigate: (slide: number) => void
+) {
   const panel = root.querySelector<HTMLElement>(".walkthrough")!;
   const stage = root.querySelector<HTMLElement>(".tour-stage")!;
   const caption = panel.querySelector<HTMLElement>(".walkthrough-caption")!;
   const back = root.querySelector<HTMLButtonElement>("[data-back]")!;
   const next = root.querySelector<HTMLButtonElement>("[data-next]")!;
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-  let index = 0,
+  let index = initialSlide - 1,
     running = false,
     controller: AbortController | undefined;
   function clear() {
@@ -49,7 +58,7 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
     running = true;
     controls();
     text(step.title, step.description);
-    step.prepare();
+    step.prepare(animate);
     const cue = (element: Element | null, kind: "action" | "result") => {
       signal.throwIfAborted();
       root
@@ -112,6 +121,7 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
     const keyboard = event.detail === 0;
     const trigger = direction === 1 ? next : back;
     index += direction;
+    onNavigate(index + 1);
     await show(
       root.dataset.embeddedExplanations === "true" ||
         (direction === 1 && !keyboard)
@@ -160,6 +170,9 @@ export function walkthrough(root: HTMLElement, steps: Step[]) {
   };
   return {
     destroy,
+    get slide() {
+      return index + 1;
+    },
     refresh: () => {
       void show(false);
     },

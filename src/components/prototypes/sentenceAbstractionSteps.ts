@@ -18,6 +18,37 @@ type Position = {
 };
 type Word = { key: string; text: string; rect: Position };
 
+// A persistent explanation needs no extra click until its text changes.
+const beats: readonly {
+  visual: number;
+  explanation: number | null;
+  title: string;
+  underlined?: boolean;
+}[] = [
+  { visual: -1, explanation: 0, title: "Imagine editing an essay" },
+  { visual: 0, explanation: 0, title: "Show the paragraph" },
+  {
+    visual: 0,
+    explanation: 1,
+    underlined: true,
+    title: "Keep the intent, change the format",
+  },
+  { visual: 1, explanation: 1, title: "Name the rhetorical device" },
+  {
+    visual: 2,
+    explanation: 1,
+    title: "Move the sentence into the left column",
+  },
+  { visual: 3, explanation: 1, title: "Connect the rhetorical devices" },
+  { visual: 4, explanation: 1, title: "Choose a different device" },
+  { visual: 5, explanation: 1, title: "Write into the new form" },
+  { visual: 5, explanation: 2, title: "Generate the new text" },
+  { visual: 6, explanation: 3, title: "Swap in the replacement" },
+  { visual: 7, explanation: null, title: "Resume reading" },
+];
+
+export const sentenceSlideCount = beats.length;
+
 export function sentenceAbstractionSteps(root: HTMLElement): Step[] {
   const scene = root.querySelector<HTMLElement>(".essay-scene")!;
   const measure = scene.querySelector<HTMLElement>(".essay-measure")!;
@@ -350,35 +381,6 @@ export function sentenceAbstractionSteps(root: HTMLElement): Step[] {
     'The experience I imagine here is swapping out the format (metaphor → simile) and the UI uses AI to generate the new text ("Renting is like...")',
     'And swaps it in ("Renting is throwing.." → "Renting is like..")',
   ] as const;
-
-  // A persistent explanation needs no extra click until its text changes.
-  const beats: readonly {
-    visual: number;
-    explanation: number | null;
-    title: string;
-    underlined?: boolean;
-  }[] = [
-    { visual: -1, explanation: 0, title: "Imagine editing an essay" },
-    { visual: 0, explanation: 0, title: "Show the paragraph" },
-    {
-      visual: 0,
-      explanation: 1,
-      underlined: true,
-      title: "Keep the intent, change the format",
-    },
-    { visual: 1, explanation: 1, title: "Name the rhetorical device" },
-    {
-      visual: 2,
-      explanation: 1,
-      title: "Move the sentence into the left column",
-    },
-    { visual: 3, explanation: 1, title: "Connect the rhetorical devices" },
-    { visual: 4, explanation: 1, title: "Choose a different device" },
-    { visual: 5, explanation: 1, title: "Write into the new form" },
-    { visual: 5, explanation: 2, title: "Generate the new text" },
-    { visual: 6, explanation: 3, title: "Swap in the replacement" },
-    { visual: 7, explanation: null, title: "Resume reading" },
-  ];
 
   function writeExplanation(element: HTMLElement, index: number | null) {
     element.replaceChildren();

@@ -1,8 +1,11 @@
 ---
 import Walkthrough from "./Walkthrough.astro";
+import type { WalkthroughPageProps } from "./walkthrough";
+type Props = WalkthroughPageProps;
 ---
 
 <Walkthrough
+  {...Astro.props}
   kind="one-choice-at-a-time"
   demo="/assets/prototypes/one-choice-at-a-time"
   demoAlt="a blank page becomes a short mystery as a writer chooses a genre, records a character, expands an outline, and tries another version of the opening."

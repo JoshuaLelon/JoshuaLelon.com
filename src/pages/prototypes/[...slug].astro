@@ -7,33 +7,48 @@ import Footer from "@/components/Footer.astro";
 import config from "@/config";
 import Tag from "@/components/Tag.astro";
 import PrototypeDemo from "@/components/prototypes/PrototypeDemo.astro";
+import { sentenceSlideCount } from "@/components/prototypes/sentenceAbstractionSteps";
+import { writingSlideCount } from "@/components/prototypes/writingSteps";
 import { slugifyStr } from "@/utils/slugify";
 
 export async function getStaticPaths() {
   const entries = await getCollection("prototypes", ({ data }) => !data.draft);
-  return entries.map(entry => ({
-    params: { slug: entry.id },
-    props: { entry },
-  }));
+  const counts = {
+    "sentence-abstraction": sentenceSlideCount,
+    "one-choice-at-a-time": writingSlideCount,
+  };
+  return entries.flatMap(entry => [
+    { params: { slug: entry.id }, props: { entry } },
+    ...Array.from({ length: counts[entry.data.demo] }, (_, index) => ({
+      params: { slug: `${entry.id}/${index + 1}` },
+      props: { entry, slide: index + 1 },
+    })),
+  ]);
 }
 interface Props {
   entry: CollectionEntry<"prototypes">;
+  slide?: number;
 }
-const { entry } = Astro.props;
+const { entry, slide } = Astro.props;
 const { data } = entry;
 const { Content } = await render(entry);
 const locale = Astro.currentLocale ?? config.site.lang;
+const prototypePath =
+  getRelativeLocaleUrl(locale, `prototypes/${entry.id}`).replace(/\/$/, "") +
+  "/";
 ---
 
 <Layout
   title={`${data.title} | ${config.site.title}`}
   description={data.description}
   ogImage={data.preview}
+  canonicalURL={new URL(prototypePath, Astro.site).href}
 >
   <Header />
   <main
     id="main-content"
-    data-pagefind-body
+    data-pagefind-body={slide ? undefined : ""}
+    data-pagefind-ignore={slide ? "all" : undefined}
     class="mx-auto w-full max-w-5xl px-4 pt-10 pb-16"
   >
     <header class="mb-8">
@@ -71,7 +86,7 @@ const locale = Astro.currentLocale ?? config.site.lang;
       }
     </header>
     <article class="app-prose experiment-body">
-      <PrototypeDemo kind={data.demo} />
+      <PrototypeDemo kind={data.demo} {prototypePath} {slide} />
       <Content />
     </article>
     {

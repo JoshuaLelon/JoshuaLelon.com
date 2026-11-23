@@ -202,6 +202,8 @@ const tour: Beat[] = [
     note: "the finished mystery opens with the sound of the envelope and ends with a goodbye from every house on nell’s route.",
   },
 ];
+export const writingSlideCount = tour.length;
+
 type Choice = [string, string?];
 const alternatives = (...names: string[]): Choice[] =>
   names.map(name => [name]);
@@ -740,13 +742,13 @@ export function writingSteps(root: HTMLElement): Step[] {
       description: "",
       target: null,
       result: null,
-      prepare() {
+      prepare(animate) {
         help.close();
         closeMenu();
         dock
           .querySelector("[data-help-hover]")
           ?.removeAttribute("data-help-hover");
-        direction = Math.sign(i - current);
+        direction = animate ? Math.sign(i - current) : 0;
         current = i;
       },
       async run({ tween }) {

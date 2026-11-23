@@ -1,8 +1,11 @@
 ---
 import Walkthrough from "./Walkthrough.astro";
+import type { WalkthroughPageProps } from "./walkthrough";
+type Props = WalkthroughPageProps;
 ---
 
 <Walkthrough
+  {...Astro.props}
   kind="sentence-abstraction"
   demo="/assets/prototypes/sentence-abstraction"
   demoAlt="A metaphor within an essay is labeled, moved aside, rewritten as a simile, and returned to the paragraph."

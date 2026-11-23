@@ -4,7 +4,9 @@ import SentenceAbstractionDemo from "./SentenceAbstractionDemo.astro";
 
 import WritingChoices from "./WritingChoices.astro";
 
-interface Props {
+import type { WalkthroughPageProps } from "./walkthrough";
+
+interface Props extends WalkthroughPageProps {
   kind: CollectionEntry<"prototypes">["data"]["demo"];
 }
 
@@ -12,7 +14,8 @@ const demos = {
   "sentence-abstraction": SentenceAbstractionDemo,
   "one-choice-at-a-time": WritingChoices,
 };
-const Demo = demos[Astro.props.kind];
+const { kind, ...page } = Astro.props;
+const Demo = demos[kind];
 ---
 
-<Demo />
+<Demo {...page} />
