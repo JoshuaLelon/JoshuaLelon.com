@@ -12,6 +12,17 @@ interface WritingDecision {
   answers: readonly string[];
 }
 export const storyFrameworks = {
+  viewpoint: {
+    source: "phsc writing center",
+    url: "https://writing-center.phsc.edu/writing/literature/fiction/fiction-point-view",
+    answers: [
+      "first person",
+      "second person",
+      "third-person objective",
+      "third-person limited",
+      "third-person omniscient",
+    ],
+  },
   emotionalArc: {
     source: "reagan et al.",
     url: "https://doi.org/10.1140/epjds/s13688-016-0093-1",

@@ -199,6 +199,42 @@ glossary(rhetoric, {
     "the whole village could have heard that envelope land.",
   ],
 });
+glossary(
+  {
+    name: storyFrameworks.viewpoint.source,
+    url: storyFrameworks.viewpoint.url,
+  },
+  {
+    "which point of view?": [
+      "point of view determines who tells the story and whose thoughts the reader can hear.",
+      "nell can tell the story herself, or a narrator can follow her until she discovers the hatch.",
+    ],
+    "point of view": [
+      "choose whose perceptions reach the reader.",
+      "follow nell’s suspicions or let the reader in on the baker’s plan.",
+    ],
+    "first person": [
+      "a character tells the story as “i.”",
+      "i held the key. i knew that slot was bolted.",
+    ],
+    "second person": [
+      "the narration addresses a character as “you.”",
+      "you turn the key and hear an envelope land.",
+    ],
+    "third-person objective": [
+      "a narrator reports observable actions and speech.",
+      "nell tried the bolt twice. the baker wiped flour from his hands.",
+    ],
+    "third-person limited": [
+      "a narrator follows one character’s perceptions and thoughts.",
+      "nell could hear the envelope. how had it got past the bolt?",
+    ],
+    "third-person omniscient": [
+      "a narrator can reveal what several characters know or think.",
+      "nell feared a trick. behind the wall, the baker hoped she would smile.",
+    ],
+  }
+);
 glossary(editor, {
   "how much detail?": [
     "choose the size and treatment of the selected material as it becomes prose.",
