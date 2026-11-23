@@ -25,7 +25,7 @@ import {
 } from "./writingMotion";
 
 type Question =
-  "kind" | "lens" | "premise" | "fact" | "viewpoint" | "form";
+  "kind" | "lens" | "premise" | "fact" | "viewpoint" | "form" | "craft";
 type Leaf = `${number}/${string}`;
 type Scroll = {
   zone: "answers" | "question" | "margin" | "essay";
@@ -87,7 +87,34 @@ function label(s: State, q: Question) {
     fact: s.kind === "story" ? "character archetype" : example(s).fact,
     viewpoint: "point of view",
     form: "rhetorical form",
+    craft: "story decision",
   }[q];
+}
+// Sibling order drives both the parent’s answer rail and the horizontal previews.
+const storyQuestions: Question[] = [
+  "lens",
+  "viewpoint",
+  "premise",
+  "fact",
+  "form",
+];
+function questionNeighbors(
+  s: State
+): Partial<Record<Scroll["direction"], Question>> {
+  if (s.kind !== "story") return {};
+  if (s.question === "kind") return { down: "craft" };
+  if (s.question === "craft") {
+    return {
+      up: "kind",
+      down: storyQuestions.find(q => label(s, q) === s.inspected.craft),
+    };
+  }
+  const index = storyQuestions.indexOf(s.question);
+  return {
+    up: "craft",
+    left: storyQuestions[index - 1],
+    right: storyQuestions[index + 1],
+  };
 }
 function scope(s: State, explicitMask?: number) {
   const mask = explicitMask ?? s.selected;
@@ -184,7 +211,37 @@ const tour: Beat[] = [
     action: "show/outline",
     foldOutlineFirst: true,
     enter: ".beat-list",
-    note: "the writer scrolls down over the story to grow its first leaf, the moment nell hears the letter land.",
+    note: "the writer scrolls across the possible narrators to see whose perspective could carry the story.",
+  },
+  {
+    scroll: { zone: "answers", direction: "right" },
+    inspect: "third-person limited",
+    note: "“third-person limited” is in view. the writer moves up to the question and scrolls up to see which other story decisions are available.",
+  },
+  {
+    scroll: { zone: "question", direction: "up" },
+    note: "“point of view” marks the question the writer came from. scrolling down over the heading returns to it.",
+  },
+  {
+    scroll: { zone: "question", direction: "down" },
+    note: "“third-person limited” is still in view. this time the writer scrolls right over the question itself to visit a question at the same level.",
+  },
+  {
+    scroll: { zone: "question", direction: "right" },
+    note: "the question now asks about the emotional arc. scrolling up from here opens the same list of story decisions, this time at “emotional arc.”",
+  },
+  {
+    scroll: { zone: "question", direction: "up" },
+    note: "the writer scrolls left through these choices to return to “point of view.”",
+  },
+  {
+    scroll: { zone: "answers", direction: "left" },
+    inspect: "point of view",
+    note: "with “point of view” in view, the writer scrolls down over the heading to open that question.",
+  },
+  {
+    scroll: { zone: "question", direction: "down" },
+    note: "the outline is already open. the writer scrolls down over the story to grow its first leaf, the moment nell hears the letter land.",
   },
   {
     scroll: { zone: "essay", direction: "down" },
@@ -270,6 +327,11 @@ function lensChoices(s: State): Choice[] {
 function options(s: State): [string, Choice[]] {
   const e = example(s);
   switch (s.question) {
+    case "craft":
+      return [
+        "which story decision?",
+        alternatives(...storyQuestions.map(q => label(s, q))),
+      ];
     case "kind":
       return [
         "what are you making?",
@@ -768,6 +830,19 @@ export function writingSteps(root: HTMLElement): Step[] {
   return tour.map((beat, i) => {
     const previous = state;
     const slide = { ...state, ...beat.changes };
+    if (beat.scroll?.zone === "question") {
+      const target = questionNeighbors(previous)[beat.scroll.direction];
+      if (!target)
+        throw new Error(
+          `no question ${beat.scroll.direction} of ${previous.question}`
+        );
+      slide.question = target;
+      if (target === "craft")
+        slide.inspected = {
+          ...slide.inspected,
+          craft: label(previous, previous.question),
+        };
+    }
     if (beat.inspect)
       slide.inspected = { ...slide.inspected, [slide.question]: beat.inspect };
     if (beat.scroll?.zone === "essay")

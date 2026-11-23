@@ -239,6 +239,26 @@ glossary(editor, {
     "name something the reader can picture, hear, or otherwise sense.",
     "the envelope hit the tin floor.",
   ],
+  "which story decision?": [
+    "pick an aspect of the draft to work on. each choice opens a question about that aspect.",
+    "open emotional arc to compare the rise and fall of nell’s fortunes.",
+  ],
+  "emotional arc": [
+    "the sequence of emotional rises and falls across a story.",
+    "nell feels remembered, then forgotten, then remembered again.",
+  ],
+  genre: [
+    "the family of stories that supplies the reader’s expectations.",
+    "the sealed postbox poses a puzzle in a mystery.",
+  ],
+  "character archetype": [
+    "the role a character plays in the story.",
+    "as a skeptic, nell checks the evidence before believing the letter.",
+  ],
+  "rhetorical form": [
+    "the device that gives a detail its wording.",
+    "use a simile to describe the sound inside the box.",
+  ],
 });
 glossary(brief, {
   "which structure?": [
