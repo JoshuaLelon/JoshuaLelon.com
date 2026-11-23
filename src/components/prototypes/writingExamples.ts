@@ -57,6 +57,7 @@ interface Version {
   premise: string;
   premiseDecision: WritingDecision;
   passages: Passage[];
+  leafDetails?: Record<string, string>;
 }
 interface Example {
   lens: string;
@@ -102,6 +103,10 @@ export const examples: Record<Kind, Example> = {
     versions: [
       {
         label: "mystery",
+        leafDetails: {
+          "1/lead":
+            "nell wrote “5:14” in her collection book and drew a line beneath it.",
+        },
         premise:
           "on the morning a village postbox is sealed, nell finds a fresh letter inside it.",
         premiseDecision: storyFrameworks.emotionalArc,
@@ -130,7 +135,12 @@ export const examples: Record<Kind, Example> = {
             "the baker shows her the sorting hatch. inside the envelope, every house on her route has signed.",
             "the baker slid a tray aside and showed her the old sorting hatch. “go on, open it.” inside, in delivery order, was a signature from every house on her route.",
             "the hatch behind the bread trays was the postbox’s second mouth. nell opened the envelope. every house on her route had signed.",
-            "a square of wall swung open like a cupboard door. “that’s how i posted it,” he said. nell unfolded a goodbye signed by every house on her route."
+            "a square of wall swung open like a cupboard door. “that’s how i posted it,” he said. nell unfolded a goodbye signed by every house on her route.",
+            [
+              "old sorting hatch",
+              "postbox’s second mouth",
+              "like a cupboard door",
+            ]
           ),
         ],
       },

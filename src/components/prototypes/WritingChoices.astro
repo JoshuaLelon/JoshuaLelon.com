@@ -54,7 +54,9 @@ type Props = WalkthroughPageProps;
             stroke-width="1.7"
             stroke-linejoin="round"></path>
         </svg>
+        <span class="scroll-direction"></span>
       </div>
+      <div class="selection-margin" aria-hidden="true"></div>
       <div class="draft-page" aria-label="document"></div>
       <div class="decision-dock" aria-label="writing choices"></div>
     </div>
@@ -74,6 +76,9 @@ type Props = WalkthroughPageProps;
 </Walkthrough>
 <style is:global>
   .writing-scene {
+    --selection-rail: 24px;
+    --marker-width: 18px;
+    --tree-indent: clamp(1.25rem, 4cqi, 1.5rem);
     container-type: inline-size;
     border: 1px solid var(--edge);
     border-radius: 8px;
@@ -115,6 +120,49 @@ type Props = WalkthroughPageProps;
   .writing-pointer svg {
     transform: translate(-2px, -2px);
     transform-origin: 2px 2px;
+  }
+  .scroll-direction {
+    display: none;
+    position: absolute;
+    left: 18px;
+    top: 4px;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border: 1px solid var(--green);
+    border-radius: 50%;
+    background: var(--paper);
+    color: var(--green);
+    font:
+      600 15px/1 system-ui,
+      sans-serif;
+  }
+  .writing-pointer[data-scroll] .scroll-direction {
+    display: grid;
+  }
+  .selection-margin {
+    position: absolute;
+    z-index: 1;
+    inset: 0 auto 0 0;
+    width: var(--selection-rail);
+    grid-area: 1 / 1 / 2 / 2;
+    background: var(--canvas);
+    border-inline-end: 1px solid var(--edge);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .writing-workbench:has(.beat-list) .selection-margin {
+    opacity: 1;
+  }
+  /* Each branch keeps its disclosure in the parent's gutter. */
+  .draft-page:has(.draft-tree) {
+    padding-inline-start: calc(
+      var(--selection-rail) + var(--marker-width) + 2px
+    );
+  }
+  .draft-page [data-contains-selection] .draft-words {
+    text-decoration: underline dashed var(--green);
+    text-underline-offset: 4px;
   }
   .draft-page [data-drafting] {
     position: relative;
@@ -165,14 +213,12 @@ type Props = WalkthroughPageProps;
     outline-offset: -2px;
   }
   .decision-head,
-  .choice-list,
-  .range-controls {
+  .choice-list {
     display: flex;
     align-items: center;
     gap: 5px;
   }
-  .decision-head button,
-  .range-controls button {
+  .decision-head button {
     font-size: 12px;
     color: var(--secondary);
   }
@@ -182,7 +228,6 @@ type Props = WalkthroughPageProps;
     align-content: start;
     padding: 24px 32px;
   }
-  .draft-page p,
   .draft-page .premise-text,
   .draft-page .beat-text {
     margin: 0;
@@ -233,7 +278,6 @@ type Props = WalkthroughPageProps;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    --disclosure-width: 20px;
     --bracket-ink: var(--secondary);
   }
   .draft-tree > :is(.premise-row, .genre-menu) {
@@ -389,61 +433,74 @@ type Props = WalkthroughPageProps;
   }
   .premise-row,
   .beat-branch {
-    padding-inline-start: var(--disclosure-width);
     width: fit-content;
     max-width: 100%;
   }
-  .writing-scene .draft-disclosure {
+  .story-body,
+  .act-body {
+    position: relative;
+    min-width: 0;
+  }
+  /* Anchor to the first text baseline, including when a term has a label above it. */
+  .branch-marker {
     position: relative;
     display: inline-block;
+    width: 0;
+    height: 0;
     vertical-align: baseline;
-    width: var(--disclosure-width);
-    height: 0.8em;
-    margin-inline-start: calc(0px - var(--disclosure-width));
+  }
+  .writing-scene .draft-disclosure {
+    appearance: none;
+    position: absolute;
+    inset-inline-end: 0;
+    bottom: calc(0.68ex - 7px);
+    width: var(--marker-width);
+    height: 14px;
+    overflow: hidden;
     min-height: 0;
     padding: 0;
     border: 0;
     color: var(--green);
     font: inherit;
   }
-  .branch-caption {
-    display: block;
-    margin-inline-start: calc(0px - var(--disclosure-width));
-    padding-block-end: 5px;
-    color: var(--green);
-    font:
-      11px/1.4 ui-monospace,
-      monospace;
+  :is(.story-body, .act-body):has(> .branch-marker),
+  .prose-leaf:has(> .leaf-detail) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: first baseline;
   }
-  .branch-caption:empty {
-    display: none;
+  :is(.story-body, .act-body, .prose-leaf:has(> .leaf-detail))
+    > :is(.branch-marker, .beat-list, .scene-prose, .leaf-detail) {
+    grid-area: 1 / 1;
   }
-  /* Reserve the action line on individually selected beats. */
-  .beat[data-selected] .act-body > .branch-caption {
-    display: block;
-    min-block-size: calc(1.4em + 5px);
-  }
-  .draft-page :is(.branch-caption, .draft-disclosure[data-caption]) {
-    opacity: var(--branch-action-opacity, var(--annotation-opacity, 1));
+  :is(.story-body, .act-body, .prose-leaf:has(> .leaf-detail))
+    > .branch-marker {
+    justify-self: start;
   }
   .draft-disclosure.generate-branch::before {
-    content: "✦";
+    content: "";
     position: absolute;
     inset: 50% auto auto 50%;
     transform: translate(-50%, -50%);
-    font:
-      16px/1 system-ui,
-      sans-serif;
-  }
-  .draft-page .scene-prose {
-    margin-inline-start: var(--disclosure-width);
-    padding-block-start: 5px;
+    width: 11px;
+    height: 11px;
+    background: currentColor;
+    clip-path: polygon(
+      50% 0%,
+      65% 35%,
+      100% 50%,
+      65% 65%,
+      50% 100%,
+      35% 65%,
+      0% 50%,
+      35% 35%
+    );
   }
   .draft-disclosure[aria-expanded]::before {
     content: "";
     position: absolute;
     left: 50%;
-    top: 52%;
+    top: 50%;
     width: 7px;
     height: 7px;
     border: solid currentColor;
@@ -456,21 +513,37 @@ type Props = WalkthroughPageProps;
   .beat-list {
     display: grid;
     gap: 5px;
-    margin: 10px 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
+  }
+  /* Every act inherits the same text and annotation columns from the outline. */
+  .beat-list {
+    grid-template-columns: minmax(0, 1fr) max-content;
+    column-gap: 6px;
+  }
+  .beat-list > .beat,
+  .beat-list > .beat > .beat-branch,
+  .beat-list > .beat > .beat-branch > .sentence-annotation {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    width: auto;
+    min-width: 0;
   }
   .beat-list .beat {
     margin: 0;
     padding: 3px 0;
   }
+  .beat-list,
+  .act-body > .scene-prose,
+  .leaf-detail {
+    margin-inline-start: var(--tree-indent);
+  }
   .beat-branch .draft-disclosure,
   .beat-list .beat-text {
     font-size: 16px;
     line-height: 1.42;
-  }
-  .draft-page .finished-copy p + p {
-    margin-top: 0.6em;
   }
   .decision-dock {
     padding: 8px 24px
@@ -573,12 +646,20 @@ type Props = WalkthroughPageProps;
   .choice-window::before {
     left: 0;
     width: var(--fade-left, 0px);
-    background: linear-gradient(to right, var(--canvas), transparent);
+    background: linear-gradient(
+      to right,
+      var(--canvas),
+      transparent
+    );
   }
   .choice-window::after {
     right: 0;
     width: var(--fade-right, 0px);
-    background: linear-gradient(to left, var(--canvas), transparent);
+    background: linear-gradient(
+      to left,
+      var(--canvas),
+      transparent
+    );
   }
   .choice-list {
     grid-area: 1 / 1;
@@ -689,6 +770,10 @@ type Props = WalkthroughPageProps;
     background: var(--paper);
     border-color: var(--edge);
     font-size: 13px;
+  }
+  .choice-list .choice-item > button[data-inspecting] {
+    border-color: var(--green);
+    background: color-mix(in srgb, var(--green) 10%, var(--paper));
   }
   .choice-label {
     display: inline-block;
@@ -851,17 +936,6 @@ type Props = WalkthroughPageProps;
       transition: none;
     }
   }
-  .range-controls {
-    justify-content: space-between;
-    margin-top: 4px;
-  }
-  .range-controls button {
-    min-height: 32px;
-  }
-  .range-controls button[data-unavailable] {
-    opacity: 0.38;
-    cursor: default;
-  }
   .writing-narration {
     min-height: calc(
       var(--narration-height, 145px) - var(--dictation-space, 0px)
@@ -890,12 +964,18 @@ type Props = WalkthroughPageProps;
     .writing-workbench {
       --workbench-height: 572px;
     }
-    .draft-page {
-      padding: 14px 12px;
-    }
+
     .decision-dock {
       --dock-inset: 12px;
       padding-inline: 12px;
+    }
+    .draft-page,
+    .selection-margin {
+      --selection-rail: 16px;
+      --marker-width: 16px;
+    }
+    .draft-page {
+      padding: 14px 12px;
     }
     .decision-dock button:not(.writing-help) {
       min-height: 44px;
@@ -906,6 +986,9 @@ type Props = WalkthroughPageProps;
       padding-inline: 18px;
     }
 
+    .beat-list {
+      grid-template-columns: minmax(0, 1fr) 6px;
+    }
     .premise-row:has(.beat-list) > .sentence-annotation,
     .beat-branch:has(.act-menu-anchor) > .sentence-annotation {
       grid-template-columns: minmax(0, 1fr) 6px;

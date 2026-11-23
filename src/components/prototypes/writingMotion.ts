@@ -55,12 +55,18 @@ function setupCarousel(dock: HTMLElement, list: HTMLElement) {
         ((list.scrollWidth - list.clientWidth) * scrollbar.valueAsNumber) / 100;
     syncCarousel(list);
   };
-  dock.onwheel = event => {
-    if (event.ctrlKey || !event.cancelable || scrollbar.hidden) return;
+  list.onwheel = event => {
+    if (
+      event.ctrlKey ||
+      !event.cancelable ||
+      scrollbar.hidden ||
+      Math.abs(event.deltaX) <= Math.abs(event.deltaY)
+    )
+      return;
     event.preventDefault();
     if (dock.closest('[aria-busy="true"]')) return;
-    const { deltaMode, deltaX, deltaY } = event;
-    let distance = Math.abs(deltaX) > Math.abs(deltaY) ? deltaX : deltaY;
+    const { deltaMode } = event;
+    let distance = event.deltaX;
     if (deltaMode === WheelEvent.DOM_DELTA_LINE)
       distance *= parseFloat(getComputedStyle(list).lineHeight) || 20;
     if (deltaMode === WheelEvent.DOM_DELTA_PAGE) distance *= list.clientWidth;
@@ -100,7 +106,8 @@ const panelTemplates = new WeakMap<HTMLElement, Node>();
 export function preparePanelChange(
   dock: HTMLElement,
   content: DocumentFragment,
-  reuse: boolean
+  reuse: boolean,
+  inspected?: string
 ) {
   const old = [...dock.children] as HTMLElement[];
   const next = [...content.children] as HTMLElement[];
@@ -171,8 +178,10 @@ export function preparePanelChange(
       });
       const list = dock.querySelector<HTMLElement>(".choice-list");
       if (list !== previousList) {
-        dock.onwheel = null;
-        if (list) setupCarousel(dock, list);
+        if (list) {
+          setupCarousel(dock, list);
+          if (inspected) void centerChoice(dock, inspected);
+        }
       }
       committed = true;
     }
@@ -297,6 +306,61 @@ export async function aimPointer(
   });
   await tween(150, () => {});
   return pointer;
+}
+
+// Browsing previews a choice without pressing it or generating text.
+export async function centerChoice(
+  dock: HTMLElement,
+  name: string,
+  tween?: Tween
+) {
+  const list = dock.querySelector<HTMLElement>(".choice-list");
+  const choice = list?.querySelector<HTMLElement>(
+    `[data-answer="${CSS.escape(name)}"]`
+  );
+  if (!list || !choice) return;
+  const start = list.scrollLeft;
+  const item = choice.getBoundingClientRect();
+  const end = Math.min(
+    list.scrollWidth - list.clientWidth,
+    Math.max(
+      0,
+      start +
+        item.left -
+        list.getBoundingClientRect().left +
+        (item.width - list.clientWidth) / 2
+    )
+  );
+  const paint = (p: number) => {
+    list.scrollLeft = start + (end - start) * smooth(p);
+    syncCarousel(list);
+  };
+  if (tween) await tween(480, paint);
+  else paint(1);
+  list.querySelector("[data-inspecting]")?.removeAttribute("data-inspecting");
+  choice.dataset.inspecting = "";
+}
+
+export async function scrollCue(
+  work: HTMLElement,
+  target: HTMLElement,
+  direction: "left" | "right" | "up" | "down",
+  tween: Tween
+) {
+  const pointer = await aimPointer(work, target, tween);
+  const arrow = pointer.querySelector<HTMLElement>(".scroll-direction")!;
+  const [glyph, x, y] = {
+    left: ["←", -1, 0],
+    right: ["→", 1, 0],
+    up: ["↑", 0, -1],
+    down: ["↓", 0, 1],
+  }[direction] as [string, number, number];
+  arrow.textContent = glyph;
+  pointer.dataset.scroll = direction;
+  await tween(480, p => {
+    arrow.style.opacity = String(phase(p, 0, 0.35));
+    arrow.style.translate = `${x * 4 * smooth(p)}px ${y * 4 * smooth(p)}px`;
+  });
 }
 
 export async function animatePress(
@@ -603,12 +667,7 @@ export async function revealWriting(
       ?.querySelector<HTMLElement>(
         `[data-branch="${generatingControl.dataset.branch}"]`
       );
-  const savedCaption = savedControl
-    ?.closest(".sentence-annotation")
-    ?.querySelector<HTMLElement>(".branch-caption");
   if (savedControl && generatingControl) {
-    if (savedCaption)
-      savedCaption.textContent = generatingControl.dataset.caption ?? "";
     generatingControl.setAttribute("aria-hidden", "true");
     savedControl.before(generatingControl);
   }
@@ -661,14 +720,7 @@ export async function revealWriting(
       const p = phase(time, proseStart, 300);
       generatingControl.style.opacity = String(1 - p);
       savedControl.style.opacity = String(p);
-      if (savedCaption) savedCaption.style.opacity = String(1 - p);
-      if (p === 1 && generatingControl.isConnected) {
-        generatingControl.remove();
-        if (savedCaption) {
-          savedCaption.textContent = "";
-          savedCaption.style.removeProperty("opacity");
-        }
-      }
+      if (p === 1) generatingControl.remove();
     }
     if (revision) {
       const retire = phase(time, 0, 280);
@@ -724,10 +776,6 @@ export async function revealWriting(
         "--annotation-opacity",
         String(phase(t, labelStart, labelDuration))
       );
-      target.style.setProperty(
-        "--branch-action-opacity",
-        String(phase(t, labelStart + labelDuration + 400, 280))
-      );
     });
     showPanel(
       phase(time, panelStart, panelDuration),
@@ -743,7 +791,6 @@ export async function revealWriting(
     target.removeAttribute("aria-busy");
     target.style.removeProperty("--prose-opacity");
     target.style.removeProperty("--annotation-opacity");
-    target.style.removeProperty("--branch-action-opacity");
     for (const el of copy) el.removeAttribute("aria-hidden");
   }
   for (const target of generated)

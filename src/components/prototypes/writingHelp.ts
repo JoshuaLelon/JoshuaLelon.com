@@ -1,5 +1,5 @@
 // Curated references for this walkthrough. Examples apply each concept to the draft.
-import { storyFrameworks, type Passage } from "./writingExamples";
+import { storyFrameworks } from "./writingExamples";
 
 type Source = { name: string; url?: string };
 export type Help = { definition: string; example?: string; source: Source };
@@ -22,7 +22,6 @@ const rhetoric: Source = {
   url: "https://rhetoric.byu.edu/",
 };
 const editor: Source = { name: "this editor · drafting controls" };
-const outline: Source = { name: "the current outline" };
 const brief: Source = { name: "the example writing briefs" };
 
 const reference = new Map<string, Help>();
@@ -236,77 +235,9 @@ glossary(
   }
 );
 glossary(editor, {
-  "how much detail?": [
-    "choose the size and treatment of the selected material as it becomes prose.",
-    "a beat can stay a one-line summary or become a scene that unfolds moment by moment.",
-  ],
-  "draft scene": [
-    "expand the selected beat into prose.",
-    "the summary about a falling letter becomes the sound nell hears through the box.",
-  ],
-  "one sentence": [
-    "compress the selected moment into a single sentence.",
-    "inside the sealed postbox, nell heard something fall.",
-  ],
-  "one paragraph": [
-    "develop the selected moment for a few connected sentences.",
-    "nell bolted the slot. an envelope struck the floor. she looked at the key in her hand.",
-  ],
-  "a full scene": [
-    "unfold the action in sequence, with room for details and reactions.",
-    "follow nell from locking the box through finding the thumbprint.",
-  ],
-  "dialogue only": [
-    "tell the selected passage through spoken exchanges.",
-    "“you locked it?” “myself.” “then whose letter is that?”",
-  ],
-  "draft another outline": [
-    "generate an alternative arrangement of beats for the same premise.",
-    "try an outline that starts with the baker’s confession.",
-  ],
-  "draft another scene": [
-    "generate another telling of the selected beat.",
-    "try nell’s arrival from the baker’s side of the hatch.",
-  ],
-  "choose a form": [
-    "choose how to phrase a specific detail in the scene.",
-    "try the sound of the letter as a simile.",
-  ],
   "concrete detail": [
     "name something the reader can picture, hear, or otherwise sense.",
     "the envelope hit the tin floor.",
-  ],
-  "ready to read it together?": [
-    "assemble the passages into a continuous draft.",
-    "read nell’s last collection from the sound of the envelope to the signatures inside.",
-  ],
-  "read draft": [
-    "open the current versions of the passages together as prose.",
-    "nell’s arrival now runs straight into her discovery of the floury thumbprint.",
-  ],
-  "near this selection": [
-    "each choice adds or removes a single passage from the current selection.",
-    "from act i, add the empty bakery in act ii to work on the turn from hope to disappointment.",
-  ],
-  "what do you want to select?": [
-    "groups divide possible selections by how much of the document they contain.",
-    "choose two passages to see the pairs available in the outline.",
-  ],
-  "whole document": [
-    "select the premise and its complete outline together.",
-    "change the genre across nell’s entire story.",
-  ],
-  "one passage": [
-    "work on an individual beat.",
-    "select act i to change how the story opens.",
-  ],
-  "two passages": [
-    "work on a pair of beats together.",
-    "select acts ii and iii to make sure the floury thumbprint pays off.",
-  ],
-  "all three passages": [
-    "work on all three beats as one selection.",
-    "adjust the pacing of the first rise, the fall, and the final rise together.",
   ],
 });
 glossary(brief, {
@@ -489,24 +420,8 @@ glossary(brief, {
     "the station clerk slides the familiar ring across the desk.",
   ],
 });
-export function helpFor(
-  label: string,
-  action: string | undefined,
-  passages: Passage[]
-): Help {
-  if (action?.startsWith("select/") && action !== "select/0") {
-    const mask = Number(action.slice(7));
-    const selected = passages.filter((_, i) => mask & (1 << i));
-    return {
-      definition:
-        selected.length === 1
-          ? "focus the next edit on this beat."
-          : "focus the next edit on these beats together.",
-      example: selected.map(p => p.summary).join(" "),
-      source: outline,
-    };
-  }
-  const entry = reference.get(label === "document" ? "whole document" : label);
+export function helpFor(label: string): Help {
+  const entry = reference.get(label);
   if (entry) return entry;
   throw new Error(`missing writing reference for “${label}”`);
 }

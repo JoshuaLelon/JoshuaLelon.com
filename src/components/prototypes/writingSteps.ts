@@ -1,9 +1,17 @@
 import { helpFor } from "./writingHelp";
 import { writingHelpPopover } from "./writingHelpPopover";
-import { examples, forms, mysteryArc, type Kind } from "./writingExamples";
+import {
+  examples,
+  forms,
+  mysteryArc,
+  storyFrameworks,
+  type Kind,
+} from "./writingExamples";
 import type { Step } from "./walkthrough";
 import {
   animatePress,
+  scrollCue,
+  centerChoice,
   aimPointer,
   animateOutlineBrackets,
   measureOutlineBrackets,
@@ -17,8 +25,12 @@ import {
 } from "./writingMotion";
 
 type Question =
-  "kind" | "lens" | "premise" | "fact" | "expand" | "form" | "read";
-type Panel = "question" | "selections";
+  "kind" | "lens" | "premise" | "fact" | "viewpoint" | "form";
+type Leaf = `${number}/${string}`;
+type Scroll = {
+  zone: "answers" | "question" | "margin" | "essay";
+  direction: "left" | "right" | "up" | "down";
+};
 type BranchState = "undrafted" | "open" | "closed";
 type State = {
   kind?: Kind;
@@ -28,27 +40,23 @@ type State = {
   scenes: [BranchState, BranchState, BranchState];
   selected: number;
   forms: number[];
-  reading: boolean;
   question: Question;
-  panel: Panel;
-  distance: number;
-  group: number;
+  leaves: Leaf[];
+  details: Partial<Record<Leaf, "closed" | "open">>;
+  // A question remembers the answer the writer was inspecting.
+  inspected: Partial<Record<Question, string>>;
   visible: boolean;
 };
 const whole = 0;
-const masks = [1, 2, 4, 3, 5, 6, 7];
-const size = (mask: number) =>
-  [1, 2, 4].filter(bit => (mask & bit) !== 0).length;
 const initial = (): State => ({
   outline: "undrafted",
   scenes: ["undrafted", "undrafted", "undrafted"],
   selected: whole,
   forms: [0, 0, 0],
-  reading: false,
   question: "kind",
-  panel: "question",
-  distance: 0,
-  group: 0,
+  leaves: [],
+  details: {},
+  inspected: {},
   visible: false,
 });
 const example = (s: State) => examples[s.kind ?? "story"];
@@ -59,19 +67,41 @@ const genericPremise = {
   essay: "when does owning two keys actually give you a backup?",
   ad: "a little tag gives lost keys a way home.",
 };
-const groupNames = ["one passage", "two passages", "all three passages"];
+function leafAct(leaf: Leaf) {
+  return Number(leaf.split("/")[0]);
+}
+function topSelectedAct(s: State) {
+  if (!s.selected && !s.leaves.length) return 0;
+  return s.scenes.findIndex((_, i) => {
+    const bit = 1 << i;
+    return (
+      Boolean(s.selected & bit) || s.leaves.some(leaf => leafAct(leaf) === bit)
+    );
+  });
+}
 function label(s: State, q: Question) {
   return {
     kind: "document type",
     lens: example(s).lens,
-    premise: "premise",
-    fact: example(s).fact,
-    expand: "level of detail",
+    premise: "emotional arc",
+    fact: s.kind === "story" ? "character archetype" : example(s).fact,
+    viewpoint: "point of view",
     form: "rhetorical form",
-    read: "finished draft",
   }[q];
 }
-function scope(s: State, mask = s.selected) {
+function scope(s: State, explicitMask?: number) {
+  const mask = explicitMask ?? s.selected;
+  if (s.leaves.length && explicitMask === undefined) {
+    const passages = version(s).passages;
+    const names = s.leaves.map(leaf => {
+      const [bit, unit] = leaf.split("/");
+      return `${passages[Math.log2(Number(bit))].label}, ${unit === "lead" ? "opening sentence" : "sentence " + (Number(unit) + 1)}`;
+    });
+    passages.forEach((p, i) => {
+      if (mask & (1 << i)) names.push(p.label);
+    });
+    return names.join(" and ");
+  }
   if (!mask) return "document";
   return version(s)
     .passages.filter((_, i) => mask & (1 << i))
@@ -84,11 +114,13 @@ function recommendation(s: State): [Question, number] {
   if (s.outline === "undrafted") return ["premise", whole];
   if (s.fact === undefined) return ["fact", whole];
   const index = s.scenes.indexOf("undrafted");
-  return index < 0 ? ["read", whole] : ["expand", 1 << index];
+  return index < 0 ? ["form", whole] : ["viewpoint", 1 << index];
 }
 // Each slide inherits only from the preceding authored slide.
 type Beat = {
   action?: string;
+  scroll?: Scroll;
+  inspect?: string;
   foldOutlineFirst?: boolean;
   explainArc?: boolean;
   changes?: Partial<State>;
@@ -144,63 +176,76 @@ const tour: Beat[] = [
   {
     action: `arc/${mysteryArc}`,
     generated: ".beat",
-    changes: { outline: "open", question: "expand" },
+    exit: ".premise-text",
+    changes: { outline: "open", question: "viewpoint" },
     note: "the writer folds the three acts to read the premise on its own, then reopens them with the same chevron.",
   },
   {
     action: "show/outline",
     foldOutlineFirst: true,
     enter: ".beat-list",
-    note: "the highlight covers the premise and all three beats. the writer opens “select passages” to work on a smaller part.",
+    note: "the writer scrolls down over the story to grow its first leaf, the moment nell hears the letter land.",
   },
   {
-    action: "browse/selections",
-    changes: { panel: "selections" },
-    note: "the menu starts with nearby selections. the writer jumps to “far” to see how the full set of selections is grouped.",
+    scroll: { zone: "essay", direction: "down" },
+    generated: '.beat[data-act="1"] .scene-prose',
+    exit: '.beat[data-act="1"] .act-body > .beat-text',
+    note: "act i’s summary gives way to its prose. nell writes down the time. the writer scrolls down again over that sentence to get a more specific detail.",
   },
   {
-    action: "level/2",
-    changes: { distance: 2 },
-    note: "the writer chooses “one passage.” the editor will show each of the three beats as a selection.",
+    scroll: { zone: "essay", direction: "down" },
+    generated: '[data-child-of="1/lead"]',
+    exit: '.passage-lead [data-leaf="1/lead"] > :not(.branch-marker)',
+    note: "the time appears in nell’s collection book. the writer uses the sparkle beside act iii to grow the ending as well.",
   },
   {
-    action: "group/0",
-    changes: { distance: 1 },
-    note: "the writer selects “act i · rise” to work on the moment nell hears the letter land.",
+    action: "expand/4",
+    generated: '.beat[data-act="4"] .scene-prose',
+    exit: '.beat[data-act="4"] .act-body > .beat-text',
+    changes: { scenes: ["open", "undrafted", "open"] },
+    note: "the opening and ending now have prose. the writer follows the editor’s suggestion to act ii, the empty bakery.",
   },
   {
-    action: "select/1",
-    changes: { panel: "question", selected: 1 },
-    note: "the writer chooses “draft scene” beside act i. the other two acts stay visible as summaries.",
+    action: "global",
+    changes: { selected: 2, leaves: [], question: "viewpoint" },
+    note: "act ii is highlighted. scrolling right in the margin keeps it and adds one nearby sentence about nell’s hope that someone remembered.",
   },
   {
-    action: "expand/1",
-    generated: ".beat[data-selected] .scene-prose",
-    changes: { scenes: ["open", "undrafted", "undrafted"] },
-    note: "nell writes down the time to the minute, putting her skepticism on the page. the writer opens the “concrete detail” label above “hit the tin floor.”",
+    scroll: { zone: "margin", direction: "right" },
+    changes: { leaves: ["1/2"] },
+    note: "the writer scrolls down in the same margin for a different selection. this time they land on two clues, one in the opening and one in the ending.",
+  },
+  {
+    scroll: { zone: "margin", direction: "down" },
+    changes: { selected: whole, leaves: ["1/0", "4/0"], question: "form" },
+    note: "the slot is bolted in act i. the baker reveals the hatch in act iii. with both sentences selected, the writer scrolls up over the prose to fold the upper scene.",
+  },
+  {
+    scroll: { zone: "essay", direction: "up" },
+    note: "act i’s underlined summary marks the hidden selection. act iii’s sentence is still highlighted. scrolling down over the essay reopens act i.",
+  },
+  {
+    scroll: { zone: "essay", direction: "down" },
+    note: "the same two sentences are highlighted again. the writer opens the “concrete detail” label above “hit the tin floor” to work on that phrase.",
   },
   {
     action: "device/1",
-    changes: { question: "form" },
+    changes: { question: "form", selected: 1, leaves: [] },
     note: "the highlight narrows to the wording the editor will rewrite. the writer chooses “simile” to change how the falling envelope sounds.",
   },
   {
     action: "form/2",
-    generated: ".annotated-form[data-selected]",
+    inspect: "simile",
+    generated: ".annotated-form[data-editing]",
     changes: { forms: [2, 0, 0] },
-    note: "the envelope now lands “like a knuckle tapping tin.” the writer chooses “read draft” to expand the remaining beats and read all three together.",
+    note: "the envelope now lands “like a knuckle tapping tin.” the writer uses act ii’s sparkle to fill in the visit to the bakery.",
   },
   {
-    action: "read",
-    generated: ".finished-copy p:nth-child(n + 2)",
-    rewriteFrom: ".beat:nth-child(n + 2) .beat-text",
-    exit: ".premise-text, .document-labels, .beat .sentence-label, .beat .term-label, .beat .draft-disclosure",
-    changes: {
-      scenes: ["open", "open", "open"],
-      selected: whole,
-      reading: true,
-    },
-    note: "the finished mystery opens with the sound of the envelope and ends with a goodbye from every house on nell’s route.",
+    action: "expand/2",
+    generated: '.beat[data-act="2"] .scene-prose',
+    exit: '.beat[data-act="2"] .act-body > .beat-text',
+    changes: { scenes: ["open", "open", "open"] },
+    note: "the visit to the bakery fills in the middle of nell’s story. all three acts now have prose.",
   },
 ];
 export const writingSlideCount = tour.length;
@@ -224,29 +269,6 @@ function lensChoices(s: State): Choice[] {
 }
 function options(s: State): [string, Choice[]] {
   const e = example(s);
-  if (s.panel === "selections") {
-    if (s.distance === 2)
-      return [
-        "what do you want to select?",
-        [
-          ["whole document", "select/0"],
-          ...groupNames.map((x, i): Choice => [x, `group/${i}`]),
-        ],
-      ];
-    const available =
-      s.distance === 0
-        ? [0, ...masks].filter(m => size(m ^ s.selected) === 1)
-        : masks.filter(m => size(m) === s.group + 1);
-    return [
-      s.distance === 0 ? "near this selection" : groupNames[s.group],
-      available.map(m => [scope(s, m), `select/${m}`]),
-    ];
-  }
-  const selectionDrafted = s.scenes.every(
-    (state, i) =>
-      (s.selected !== whole && !(s.selected & (1 << i))) ||
-      state !== "undrafted"
-  );
   switch (s.question) {
     case "kind":
       return [
@@ -277,26 +299,10 @@ function options(s: State): [string, Choice[]] {
           i < e.leads.length ? [answer, `fact/${i}`] : [answer]
         ),
       ];
-    case "expand":
+    case "viewpoint":
       return [
-        "how much detail?",
-        [
-          selectionDrafted
-            ? ["choose a form", "ask/form"]
-            : ["draft scene", "expand"],
-          ...alternatives(
-            "one sentence",
-            "one paragraph",
-            "a full scene",
-            "dialogue only"
-          ),
-          ...(s.selected === whole
-            ? alternatives("draft another outline")
-            : selectionDrafted
-              ? alternatives("draft another scene")
-              : []),
-          ["read draft", "read"],
-        ],
+        "which point of view?",
+        alternatives(...storyFrameworks.viewpoint.answers),
       ];
     case "form":
       return [
@@ -311,8 +317,6 @@ function options(s: State): [string, Choice[]] {
           ),
         ],
       ];
-    case "read":
-      return ["ready to read it together?", [["read draft", "read"]]];
   }
 }
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -332,17 +336,42 @@ function button(text: string, action?: string) {
   if (action) b.dataset.write = action;
   return b;
 }
-function passageText(s: State, i: number) {
-  const lead =
-    s.fact !== undefined && i === 0 ? example(s).leads[s.fact] + " " : "";
-  return lead + version(s).passages[i].lines[s.forms[i]];
+
+// Follow document order through already-open branches. A closed branch has saved children.
+function essayScroll(s: State, direction: Scroll["direction"]): Partial<State> {
+  const index = topSelectedAct(s);
+  if (index < 0) return {};
+  const bit = 1 << index;
+  const first = s.leaves.find(leaf => leafAct(leaf) === bit);
+  const opening: Leaf =
+    bit === 1 && s.fact !== undefined ? "1/lead" : `${bit}/0`;
+  if (s.scenes[index] === "open") {
+    let leaf: Leaf = first ? `${bit}/${first.split("/")[1]}` : opening;
+    let parent: Leaf | undefined;
+    while (s.details[leaf] === "open") {
+      parent = leaf;
+      leaf = `${leaf}/detail`;
+    }
+    if (direction === "down" && version(s).leafDetails?.[leaf])
+      return {
+        details: { ...s.details, [leaf]: "open" },
+        ...(s.details[leaf]
+          ? {}
+          : { selected: whole, leaves: [`${leaf}/detail` as Leaf] }),
+      };
+    if (direction === "up" && parent)
+      return { details: { ...s.details, [parent]: "closed" } };
+  }
+  const scenes: State["scenes"] = [...s.scenes];
+  scenes[index] = direction === "down" ? "open" : "closed";
+  return {
+    scenes,
+    ...(direction === "down" && s.scenes[index] === "undrafted"
+      ? { selected: whole, leaves: [opening] }
+      : {}),
+  };
 }
-function branchControl(
-  subject: string,
-  state: BranchState,
-  id: string,
-  showCaption = false
-) {
+function branchControl(subject: string, state: BranchState, id: string) {
   const generating = state === "undrafted";
   const action = generating
     ? id === "outline"
@@ -355,18 +384,37 @@ function branchControl(
   const verb = generating ? "draft" : state === "open" ? "hide" : "show";
   const name = `${verb} ${subject}`;
   control.setAttribute("aria-label", name);
-  control.title = name;
   if (generating) {
     control.classList.add("generate-branch");
-    if (showCaption) control.dataset.caption = name;
   } else {
     control.setAttribute("aria-expanded", String(state === "open"));
   }
-  return control;
+  const marker = el("span", "branch-marker");
+  marker.append(control);
+  return marker;
 }
 
 function ink(text: string) {
   return el("span", "draft-words", text);
+}
+function sentenceLeaf(s: State, key: Leaf, content: HTMLElement) {
+  const row = el("div", "prose-leaf");
+  row.setAttribute("role", "listitem");
+  row.dataset.leaf = key;
+  row.toggleAttribute("data-selected", s.leaves.includes(key));
+  const detail = version(s).leafDetails?.[key];
+  const state = s.details[key] ?? "undrafted";
+  row.append(branchControl("detail", state, key));
+  if (state === "closed" && s.leaves.some(leaf => leaf.startsWith(key + "/")))
+    row.dataset.containsSelection = "";
+  if (detail && state === "open") {
+    const children = el("div", "leaf-detail");
+    children.setAttribute("role", "list");
+    children.dataset.childOf = key;
+    children.append(sentenceLeaf(s, `${key}/detail`, ink(detail)));
+    row.append(children);
+  } else row.append(content);
+  return row;
 }
 // Both the bracket and its label take their position from the annotated text.
 function sentenceAnnotation(copy: HTMLElement, label: HTMLElement) {
@@ -419,7 +467,6 @@ function openTaxonomyMenu(trigger: HTMLElement, s: State, help: HelpTrigger) {
   const menu = el("span", "genre-menu");
   menu.setAttribute("role", "menu");
   const e = example(s);
-  const v = version(s);
   const isGenre = trigger.dataset.write === "genres";
   const isAct = trigger.dataset.write?.startsWith("act/");
   menu.setAttribute(
@@ -439,13 +486,7 @@ function openTaxonomyMenu(trigger: HTMLElement, s: State, help: HelpTrigger) {
     );
     item.setAttribute("role", "menuitemradio");
     item.setAttribute("aria-checked", String(name === selected));
-    menu.append(
-      withHelp(
-        item,
-        help(name, helpFor(name, action, v.passages)),
-        "choice-item"
-      )
-    );
+    menu.append(withHelp(item, help(name, helpFor(name)), "choice-item"));
   }
   trigger.setAttribute("aria-expanded", "true");
   const tree = trigger.closest<HTMLElement>(".draft-tree")!;
@@ -469,139 +510,150 @@ function renderDraft(root: HTMLElement, s: State) {
   const work = root.querySelector<HTMLElement>(".writing-workbench")!;
   work.inert = !s.visible;
   const page = work.querySelector<HTMLElement>(".draft-page")!;
-  const editingForm = !s.reading && s.question === "form";
-  page.toggleAttribute("data-selected", s.selected === whole);
+  const editingForm = s.question === "form" && !s.leaves.length;
+  page.toggleAttribute(
+    "data-selected",
+    s.selected === whole && !s.leaves.length
+  );
   page.setAttribute("role", "region");
   page.setAttribute(
     "aria-label",
     `document, ${scope(s)}${editingForm ? " wording" : ""} selected`
   );
   page.replaceChildren();
-  if (!s.kind) page.append(el("span", "blank-sheet"));
+  if (!s.kind) {
+    page.append(el("span", "blank-sheet"));
+    return;
+  }
+  const e = example(s),
+    v = version(s);
+  const tree = el("div", "draft-tree");
+  const labels = el("span", "document-labels");
+  const taxonomy = el("span", "document-type");
+  const typeLabel = s.lens === undefined ? s.kind : v.label;
+  const trigger = taxonomyTrigger(typeLabel, "genres");
+  // Keep the bracket anchored as the genre changes width.
+  taxonomy.style.setProperty(
+    "--genre-chars",
+    String(Math.max(s.kind.length, ...e.versions.map(v => v.label.length)))
+  );
+  taxonomy.append(trigger);
+  labels.append(taxonomy);
+  const sentence = s.lens === undefined ? genericPremise[s.kind] : v.premise;
+  const premise = el("div", "premise-row");
+  const storyBody = el("div", "story-body");
+  const outlineControl = branchControl("outline", s.outline, "outline");
+  if (s.outline === "open") storyBody.append(outlineControl);
   else {
-    const e = example(s),
-      v = version(s);
-    if (s.reading) {
-      const copy = el("div", "finished-copy");
-      v.passages.forEach((_, i) => {
-        const paragraph = el("p");
-        paragraph.append(ink(passageText(s, i)));
-        copy.append(paragraph);
-      });
-      page.append(copy);
-    } else {
-      const tree = el("div", "draft-tree");
-      const labels = el("span", "document-labels");
-      const taxonomy = el("span", "document-type");
-      const typeLabel = s.lens === undefined ? s.kind : v.label;
-      const trigger = taxonomyTrigger(typeLabel, "genres");
-      // Keep the bracket anchored as the genre changes width.
-      taxonomy.style.setProperty(
-        "--genre-chars",
-        String(Math.max(s.kind.length, ...e.versions.map(v => v.label.length)))
-      );
-      taxonomy.append(trigger);
-      labels.append(taxonomy);
-      const sentence =
-        s.lens === undefined ? genericPremise[s.kind] : v.premise;
-      const premiseCopy = el("div", "premise-text");
-      if (
-        s.fact !== undefined &&
-        e.factSubject &&
-        sentence.includes(e.factSubject)
-      ) {
-        const fact = taxonomyTrigger(
-          e.factDecision.answers[s.fact],
-          "archetypes"
-        );
-        fact.setAttribute(
-          "aria-label",
-          `${e.fact} · ${e.factDecision.answers[s.fact]}`
-        );
-        premiseCopy.append(annotatePhrase(sentence, e.factSubject, fact));
-      } else {
-        premiseCopy.append(ink(sentence));
-        if (s.fact !== undefined)
-          labels.append(
-            button(`${e.fact} · ${e.factDecision.answers[s.fact]}`, "ask/fact")
-          );
-      }
-      const premise = el("div", "premise-row");
-      premiseCopy.prepend(branchControl("outline", s.outline, "outline"));
-      const storyBody = el("div", "story-body");
-      storyBody.append(premiseCopy);
-      premise.append(sentenceAnnotation(storyBody, labels));
-      tree.append(premise);
-      page.append(tree);
+    const summary = el("div", "premise-text");
+    summary.append(outlineControl, ink(sentence));
+    storyBody.append(summary);
+  }
+  premise.append(sentenceAnnotation(storyBody, labels));
+  tree.append(premise);
+  page.append(tree);
 
-      if (s.outline === "open") {
-        const list = el("ol", "beat-list");
-        v.passages.forEach((p, i) => {
-          const bit = 1 << i;
-          const sceneState = s.scenes[i];
-          const expanded = sceneState === "open";
-          const item = el("li", "beat");
-          item.toggleAttribute(
-            "data-selected",
-            !editingForm && Boolean(s.selected & bit)
+  if (s.outline === "open") {
+    const list = el("ol", "beat-list");
+    v.passages.forEach((p, i) => {
+      const bit = 1 << i;
+      const sceneState = s.scenes[i];
+      const expanded = sceneState === "open";
+      const item = el("li", "beat");
+      item.dataset.act = String(bit);
+      item.toggleAttribute(
+        "data-selected",
+        !editingForm && Boolean(s.selected & bit)
+      );
+      const branch = el("div", "beat-branch");
+      const subject = s.kind === "story" ? "scene" : "passage";
+      const hiddenSelection =
+        sceneState === "closed" && s.leaves.some(leaf => leafAct(leaf) === bit);
+      const control = branchControl(
+        hiddenSelection ? subject + " with selected text" : subject,
+        sceneState,
+        String(bit)
+      );
+      const actBody = el("div", "act-body");
+      const actLabel = el("span", "beat-label");
+      if (p.direction) {
+        const anchor = el("span", "act-menu-anchor");
+        const trigger = taxonomyTrigger(p.label, `act/${i}`);
+        trigger.dataset.value = p.direction;
+        anchor.append(trigger);
+        actLabel.append(anchor);
+      } else actLabel.textContent = p.label;
+      const row = sentenceAnnotation(actBody, actLabel);
+      branch.append(row);
+      if (expanded) {
+        actBody.append(control);
+        const scene = el("div", "scene-prose beat-text");
+        scene.setAttribute("role", "list");
+        if (i === 0 && s.fact !== undefined) {
+          const lead = el("div", "passage-lead");
+          lead.append(sentenceLeaf(s, `${bit}/lead`, ink(e.leads[s.fact])));
+          scene.append(lead);
+        }
+        const annotated = el("div", "annotated-form");
+
+        const index = s.forms[i];
+        const form = forms[index];
+        const device = button(form, `device/${bit}`);
+        device.setAttribute("aria-label", `${p.label} · ${form}, change form`);
+        const text = el("div");
+        const phrase = p.formPhrases?.[index];
+        const sentences =
+          p.lines[index].match(/[^.!?]+[.!?]+[”’"]*|[^.!?]+$/gu) ?? [];
+        sentences.forEach((sentence, n) => {
+          const copy = sentence.trimStart();
+          text.append(
+            sentenceLeaf(
+              s,
+              `${bit}/${n}`,
+              phrase && copy.includes(phrase)
+                ? annotatePhrase(copy, phrase, device)
+                : ink(copy)
+            )
           );
-          const branch = el("div", "beat-branch");
-          const words = el("div", "beat-text");
-          const subject = s.kind === "story" ? "scene" : "passage";
-          const control = branchControl(
-            subject,
-            sceneState,
-            String(bit),
-            !editingForm && s.selected === bit
-          );
-          words.append(control, ink(p.summary));
-          const actBody = el("div", "act-body");
-          const actLabel = el("span", "beat-label");
-          if (p.direction) {
-            const anchor = el("span", "act-menu-anchor");
-            const trigger = taxonomyTrigger(p.label, `act/${i}`);
-            trigger.dataset.value = p.direction;
-            anchor.append(trigger);
-            actLabel.append(anchor);
-          } else actLabel.textContent = p.label;
-          const row = sentenceAnnotation(actBody, actLabel);
-          const caption = el("span", "branch-caption", control.dataset.caption);
-          caption.setAttribute("aria-hidden", "true");
-          actBody.append(caption, words);
-          branch.append(row);
-          if (expanded) {
-            const scene = el("div", "scene-prose beat-text");
-            if (i === 0 && s.fact !== undefined) {
-              const lead = el("div", "passage-lead");
-              lead.append(ink(e.leads[s.fact]));
-              scene.append(lead);
-            }
-            const annotated = el("div", "annotated-form");
-            annotated.toggleAttribute(
-              "data-selected",
-              editingForm && Boolean(s.selected & bit)
-            );
-            const index = s.forms[i];
-            const form = forms[index];
-            const device = button(form, `device/${bit}`);
-            device.setAttribute(
-              "aria-label",
-              `${p.label} · ${form}, change form`
-            );
-            annotated.append(
-              p.formPhrases
-                ? annotatePhrase(p.lines[index], p.formPhrases[index], device)
-                : sentenceAnnotation(ink(p.lines[index]), device)
-            );
-            scene.append(annotated);
-            actBody.append(scene);
-          }
-          item.append(branch);
-          list.append(item);
         });
-        storyBody.append(list);
+        annotated.append(phrase ? text : sentenceAnnotation(text, device));
+        if (editingForm && s.selected & bit) {
+          annotated.dataset.editing = "";
+          const selection =
+            annotated.querySelector<HTMLElement>(".term-annotation") ??
+            annotated;
+          selection.dataset.selected = "";
+        }
+        scene.append(annotated);
+        actBody.append(scene);
+      } else {
+        const words = el("div", "beat-text");
+        words.append(control, ink(p.summary));
+        words.toggleAttribute("data-contains-selection", hiddenSelection);
+        actBody.append(words);
       }
-    }
+      item.append(branch);
+      list.append(item);
+    });
+    storyBody.append(list);
+  }
+  if (s.fact !== undefined) {
+    // Attach a character fact to the first visible mention at this level.
+    const subject = e.factSubject;
+    const mention =
+      subject &&
+      [...storyBody.querySelectorAll<HTMLElement>(".draft-words")].find(run =>
+        run.textContent.includes(subject)
+      );
+    if (mention && subject) {
+      const name = e.factDecision.answers[s.fact];
+      const fact = taxonomyTrigger(name, "archetypes");
+      fact.setAttribute("aria-label", `${e.fact} · ${name}`);
+      mention.replaceWith(annotatePhrase(mention.textContent, subject, fact));
+    } else
+      labels.append(
+        button(`${e.fact} · ${e.factDecision.answers[s.fact]}`, "ask/fact")
+      );
   }
 }
 function panelContents(
@@ -610,38 +662,31 @@ function panelContents(
   help: HelpTrigger
 ): DocumentFragment {
   const panel = document.createDocumentFragment();
-  if (!s.visible || s.reading) return panel;
+  if (!s.visible) return panel;
   const head = el("div", "decision-head");
-  if (s.panel === "question" && s.outline !== "undrafted") {
-    head.append(button("select passages", "browse/selections"));
-    if (s.question === "form") head.append(button("read draft", "read"));
-  } else if (s.panel !== "question") {
-    head.append(el("span", "panel-label", "browse selections"));
-  }
   const controls = el("div");
-  if (s.panel === "question" && s.outline !== "undrafted") {
+  if (s.outline !== "undrafted") {
     const [q, t] = recommendation(s);
     if (q !== s.question || t !== s.selected) {
       const rec = button(
-        `next · ${q === "expand" && t ? scope(s, t) : label(s, q)} ↗`,
+        `next · ${q === "viewpoint" && t ? scope(s, t) : label(s, q)} ↗`,
         "global"
       );
       rec.title = `${scope(s, t)} · ${label(s, q)}`;
       controls.append(rec);
     }
-  } else if (s.panel !== "question") controls.append(button("close", "back"));
+  }
   if (controls.childElementCount) head.append(controls);
   if (head.childElementCount) panel.append(head);
   const [prompt, choices] = options(s);
   const list = el("div", "choice-list");
   const strip = el("div", "choice-window");
-  const v = version(s);
-  const explain = (name: string, action?: string) =>
-    help(name, helpFor(name, action, v.passages));
+  const explain = (name: string) => help(name, helpFor(name));
   for (const [text, action] of choices) {
     const choice = button("", action);
+    choice.dataset.answer = text;
     choice.append(el("span", "choice-label", text));
-    list.append(withHelp(choice, explain(text, action), "choice-item"));
+    list.append(withHelp(choice, explain(text), "choice-item"));
   }
   const scrollbar = el("input", "choice-scrollbar");
   scrollbar.type = "range";
@@ -652,34 +697,17 @@ function panelContents(
   scrollbar.hidden = true;
   scrollbar.setAttribute("aria-label", "scroll through answers");
   strip.append(list, scrollbar);
-  panel.append(
-    withHelp(el("h4", undefined, prompt), explain(prompt), "question-line"),
-    strip
+  const heading = withHelp(
+    el("h4", undefined, prompt),
+    explain(prompt),
+    "question-line"
   );
+  panel.append(heading, strip);
   list.setAttribute("aria-label", `Answers to “${prompt}”`);
-  if (s.panel === "question") {
-    const template = root.querySelector<HTMLTemplateElement>(
-      "template[data-dictation]"
-    )!;
-    panel.append(template.content.cloneNode(true));
-  }
-  if (s.panel === "selections") {
-    const range = el("div", "range-controls");
-    for (const [title, level] of [
-      ["⇤ close", 0],
-      ["− notch", s.distance - 1],
-      ["+ notch", s.distance + 1],
-      ["far ⇥", 2],
-    ] as const) {
-      const b = button(title, `level/${level}`);
-      b.toggleAttribute(
-        "data-unavailable",
-        level === s.distance || level < 0 || level > 2
-      );
-      range.append(b);
-    }
-    panel.append(range);
-  }
+  const template = root.querySelector<HTMLTemplateElement>(
+    "template[data-dictation]"
+  )!;
+  panel.append(template.content.cloneNode(true));
   return panel;
 }
 export function writingSteps(root: HTMLElement): Step[] {
@@ -740,9 +768,14 @@ export function writingSteps(root: HTMLElement): Step[] {
   return tour.map((beat, i) => {
     const previous = state;
     const slide = { ...state, ...beat.changes };
+    if (beat.inspect)
+      slide.inspected = { ...slide.inspected, [slide.question]: beat.inspect };
+    if (beat.scroll?.zone === "essay")
+      Object.assign(slide, essayScroll(previous, beat.scroll.direction));
     state = slide;
     const movingSelection =
       previous.selected !== slide.selected ||
+      previous.leaves !== slide.leaves ||
       (previous.question === "form") !== (slide.question === "form");
     let direction = 0;
     return {
@@ -751,6 +784,9 @@ export function writingSteps(root: HTMLElement): Step[] {
       target: null,
       result: null,
       prepare(animate) {
+        const pointer = work.querySelector<HTMLElement>(".writing-pointer")!;
+        pointer.hidden = true;
+        delete pointer.dataset.scroll;
         help.close();
         closeMenu();
         dock
@@ -760,6 +796,41 @@ export function writingSteps(root: HTMLElement): Step[] {
         current = i;
       },
       async run({ tween }) {
+        const gesture = direction > 0 ? beat.scroll : undefined;
+        const fold =
+          direction < 0
+            ? tour[i + 1]?.scroll?.zone === "essay" && !tour[i + 1]?.generated
+            : beat.scroll?.zone === "essay" && !beat.generated;
+        const activeAct = topSelectedAct(slide);
+        const foldedScene = `.beat[data-act="${1 << activeAct}"] .scene-prose`;
+        if (gesture) {
+          const targets = {
+            answers: ".choice-list",
+            question: ".question-line h4",
+            margin: ".selection-margin",
+            essay: `.beat[data-act="${1 << activeAct}"]`,
+          };
+          let target = work.querySelector<HTMLElement>(targets[gesture.zone])!;
+          if (gesture.zone === "essay")
+            target =
+              target.querySelector<HTMLElement>(
+                "[data-leaf][data-selected], [data-contains-selection]"
+              ) ??
+              target.querySelector<HTMLElement>(
+                ".act-body .draft-words:not(:empty)"
+              )!;
+
+          await scrollCue(work, target, gesture.direction, tween);
+          if (gesture.zone === "answers" && beat.inspect)
+            await centerChoice(dock, beat.inspect, tween);
+        }
+        if (fold && slide.scenes[activeAct] === "closed") {
+          const body = page.querySelector<HTMLElement>(foldedScene);
+          if (body)
+            await tween(240, p => {
+              body.style.opacity = String(1 - p);
+            });
+        }
         if (direction > 0 && beat.foldOutlineFirst) {
           const fold = page.querySelector<HTMLElement>(
             '[data-write="hide/outline"]'
@@ -799,12 +870,24 @@ export function writingSteps(root: HTMLElement): Step[] {
         const changing =
           direction > 0 ? parts(beat.rewriteFrom ?? beat.generated) : [];
         let revision: Awaited<ReturnType<typeof pendingRevision>> | undefined;
+        const undo = direction < 0 ? tour[i + 1] : undefined;
+        const scrollingQuestions =
+          direction !== 0 && (undo ?? beat).scroll?.zone === "question";
         const panel = preparePanelChange(
           dock,
           panelContents(root, slide, help.trigger),
-          direction !== 0
+          direction !== 0,
+          slide.inspected[slide.question]
         );
-        const undo = direction < 0 ? tour[i + 1] : undefined;
+        const selectionGesture = (undo ?? beat).scroll;
+        const near =
+          selectionGesture?.zone === "margin" &&
+          ["left", "right"].includes(selectionGesture.direction);
+        const addedLeaves = near
+          ? parts("[data-leaf][data-selected]").filter(
+              el => !slide.leaves.includes(el.dataset.leaf as Leaf)
+            )
+          : [];
         const draftFloor = !slide.visible || !slide.kind ? 0 : 0.52;
         if (direction < 0) {
           // Returning to a known revision needs no simulated generation wait.
@@ -820,7 +903,7 @@ export function writingSteps(root: HTMLElement): Step[] {
           const ink = Number(
             term?.style.getPropertyValue("--annotation-opacity") || 1
           );
-          await tween(term ? 480 : 200, p => {
+          await tween(term || scrollingQuestions ? 480 : 200, p => {
             if (term) {
               const ease = p * p * (3 - 2 * p);
               term.style.setProperty(
@@ -836,6 +919,8 @@ export function writingSteps(root: HTMLElement): Step[] {
               page.style.opacity = String(
                 fromDraft + (draftFloor - fromDraft) * p
               );
+            for (const leaf of addedLeaves)
+              leaf.style.setProperty("--selection-amount", (1 - p) * 100 + "%");
             panel.paint(p / 2, p / 2);
             narration.style.opacity = String(fromNote * (1 - p));
           });
@@ -847,11 +932,12 @@ export function writingSteps(root: HTMLElement): Step[] {
             const opacity = String(1 - p);
             narration.style.opacity = opacity;
             for (const target of outgoing) target.style.opacity = opacity;
-            if (movingSelection)
+            if (movingSelection && !near)
               page.style.setProperty("--selection-amount", `${(1 - p) * 100}%`);
           });
         }
-        work.querySelector<HTMLElement>(".writing-pointer")!.hidden = true;
+        const pointer = work.querySelector<HTMLElement>(".writing-pointer")!;
+        if (!gesture) pointer.hidden = true;
         const termBeforeUndo = undo?.action?.startsWith("genre/")
           ? page.querySelector(".term-label")?.getBoundingClientRect()
           : undefined;
@@ -860,7 +946,39 @@ export function writingSteps(root: HTMLElement): Step[] {
           (displayed.outline === "open" || slide.outline === "open")
             ? measureOutlineBrackets(page)
             : undefined;
+        const beforeFold = fold
+          ? [...page.querySelectorAll<HTMLElement>(".act-body")].map(
+              row => row.getBoundingClientRect().top
+            )
+          : [];
         renderDraft(root, slide);
+        const rows = beforeFold.length
+          ? [...page.querySelectorAll<HTMLElement>(".act-body")]
+          : [];
+        const offsets = rows.map(
+          (row, i) => beforeFold[i] - row.getBoundingClientRect().top
+        );
+        const foldIn =
+          fold && slide.scenes[activeAct] === "open"
+            ? page.querySelector<HTMLElement>(foldedScene)
+            : null;
+        const moveFolds = () =>
+          rows.length
+            ? tween(420, p => {
+                const remaining = (1 - p) ** 2;
+                rows.forEach((row, i) => {
+                  // Move each whole scene, including its prose, with its summary.
+                  row.style.translate =
+                    p === 1 ? "" : `0 ${offsets[i] * remaining}px`;
+                });
+                if (foldIn) foldIn.style.opacity = String(1 - remaining);
+              })
+            : undefined;
+        const incomingLeaves = near
+          ? parts("[data-leaf][data-selected]").filter(
+              el => !previous.leaves.includes(el.dataset.leaf as Leaf)
+            )
+          : [];
         const moveBrackets = () =>
           brackets && animateOutlineBrackets(page, brackets, tween);
         displayed = slide;
@@ -875,7 +993,8 @@ export function writingSteps(root: HTMLElement): Step[] {
             move?.(0);
             await Promise.all([
               moveBrackets(),
-              tween(move ? 450 : 270, p => {
+              moveFolds(),
+              tween(move || scrollingQuestions ? 450 : 270, p => {
                 move?.(p * p * (3 - 2 * p));
                 if (undo?.generated || !slide.visible)
                   page.style.opacity = String(
@@ -893,6 +1012,7 @@ export function writingSteps(root: HTMLElement): Step[] {
           work.style.opacity = "1";
           await Promise.all([
             moveBrackets(),
+            moveFolds(),
             revealWriting(
               parts(beat.generated),
               parts(beat.enter),
@@ -900,7 +1020,12 @@ export function writingSteps(root: HTMLElement): Step[] {
               (question, answers) => {
                 narration.style.opacity = String(question);
                 panel.paint(question, answers);
-                if (movingSelection)
+                for (const leaf of incomingLeaves)
+                  leaf.style.setProperty(
+                    "--selection-amount",
+                    question * 100 + "%"
+                  );
+                if (movingSelection && !near)
                   page.style.setProperty(
                     "--selection-amount",
                     `${question * 100}%`
@@ -912,6 +1037,38 @@ export function writingSteps(root: HTMLElement): Step[] {
             ),
           ]);
           page.style.removeProperty("--selection-amount");
+        }
+        const focus = slide.inspected[slide.question];
+        if (focus) await centerChoice(dock, focus);
+        else {
+          const previouslyInspected = dock.querySelector("[data-inspecting]");
+          if (previouslyInspected) {
+            previouslyInspected.removeAttribute("data-inspecting");
+            dock.querySelector(".choice-list")!.scrollLeft = 0;
+          }
+        }
+        if (gesture) {
+          await tween(180, p => {
+            pointer.style.opacity = String(1 - p);
+          });
+          pointer.hidden = true;
+          delete pointer.dataset.scroll;
+        }
+        if (direction <= 0 && !focus) {
+          const list = dock.querySelector<HTMLElement>(".choice-list");
+          if (list) {
+            list.scrollLeft = 0;
+            const chosen =
+              beat.action &&
+              list.querySelector<HTMLElement>(
+                `[data-write="${CSS.escape(beat.action)}"]`
+              );
+            if (chosen)
+              await revealTarget(
+                chosen.closest<HTMLElement>(".choice-item")!,
+                tween
+              );
+          }
         }
         if (dictating) {
           await tween(320, () => {});
